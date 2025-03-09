@@ -5,21 +5,37 @@ const config = {
 }
 
 // Get secrets
-require('dotenv').config();
+import dotenv from "dotenv";
+dotenv.config();
 
 
 // Path
-const path = require("path");
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 global.public_path = path.join(__dirname, "public");
 
 // Express
-const express = require("express");
+import express from "express";
 const app = express();
 
 // HTTP
-const http = require("http");
+import http from "http";
 const server = http.createServer(app);
 
+// Coced-parses
+import codec_parser from "codec-parser";
+import fs from "fs";
+
+const parser = new codec_parser("audio/flac");
+const frames = parser.parseAll(fs.readFileSync("E:/Media/Music/Detach.flac"));
+
+const frame = frames[0];
+console.log(frame)
+app.get("/test", (req, res) => {
+    res.send(fs.readFileSync("E:/Media/Music/Detach.flac"));
+})
 
 // Start server
 app.use(express.static(global.public_path));

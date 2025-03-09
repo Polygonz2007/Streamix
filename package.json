@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A music streaming servive made by me for me",
   "main": "app.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -17,8 +18,10 @@
   },
   "homepage": "https://github.com/Polygonz2007/Streamix#readme",
   "dependencies": {
+    "codec-parser": "^2.5.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "fs": "^0.0.1-security",
     "path": "^0.12.7"
   }
 }

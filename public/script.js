@@ -1,34 +1,63 @@
-const audioCtx = new AudioContext();
+const doc = document;
 
-function prepare_source(data, length, samplerate) {
-  // Create an empty three-second stereo buffer at the sample rate of the AudioContext
-  const buffer = audioCtx.createBuffer(
-    2,
-    length,
-    samplerate,
-  );
+(async () => {
+  // Flac decoder
+  const { FLACDecoderWebWorker, FLACDecoder } = window["flac-decoder"];
+  const decoder = new FLACDecoder();
+  await decoder.ready;
 
-  // Fill the buffer with white noise
-  for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
-    const nowBuffering = buffer.getChannelData(channel);
-
-    for (let i = 0; i < buffer.length; i++) {
-      let volume = 0.0001;
-
-      nowBuffering[i] = (0.5 + Math.tan(i / 800) * 0.5) % 1;
+  async function decode_frame(frame) {
+    const length = frame.header.blockSize;
+    let frame_data = new Uint8Array(length);
+    for (let i = 0; i < length; i++) {
+      frame_data[i] = frame.data[i];
     }
+
+    console.log(frame_data)
+    const decoded = await decoder.decodeFrames([frame]);
+
+    console.log(decoded.channelData, decoded.samplesDecoded);
   }
 
-  // Get an AudioBufferSourceNode
-  const source = audioCtx.createBufferSource();
-  source.buffer = buffer;
-  source.connect(audioCtx.destination);
+  // Audio Context
+  const audioCtx = new AudioContext();
 
-  return source;
-}
+  function prepare_source(data, length, samplerate) {
+    const buffer = audioCtx.createBuffer(2, length,  samplerate);
 
-// start the source playing
-document.querySelector("#play").addEventListener("click", () => {
-  prepare_source(null, 4410, 44100).start();
-})
+    // Fill the buffer with the data
+    for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+      const nowBuffering = buffer.getChannelData(channel);
+      nowBuffering[i] = data[channel];
+    }
 
+    // Get an AudioBufferSourceNode
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+
+    return source;
+  }
+
+  // start the source playing
+  //document.querySelector("#play").addEventListener("click", () => {
+  //  prepare_source(null, 4410, 44100).start();
+  //})
+
+
+  console.log("Getting test frame");
+
+  // Get and play frame
+  try {
+      const resp = await fetch("test");
+      const data = await resp.json();
+      console.log(data)
+
+      // Handle response
+      decode_frame(data)
+  } catch {
+      console.log("Couldnt do that yikes");
+  }
+
+  console.log("Fin")
+})()
