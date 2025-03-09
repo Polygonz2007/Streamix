@@ -1,0 +1,24 @@
+{
+  "name": "streamix",
+  "version": "1.0.0",
+  "description": "A music streaming servive made by me for me",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Polygonz2007/Streamix.git"
+  },
+  "author": "Polygonz2007",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Polygonz2007/Streamix/issues"
+  },
+  "homepage": "https://github.com/Polygonz2007/Streamix#readme",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "path": "^0.12.7"
+  }
+}
