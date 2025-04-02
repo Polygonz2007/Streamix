@@ -8,6 +8,7 @@ const config = {
 import dotenv from "dotenv";
 dotenv.config();
 
+const test_path = process.env.test_path;
 
 // Path
 import path from 'path';
@@ -28,13 +29,32 @@ const server = http.createServer(app);
 import codec_parser from "codec-parser";
 import fs from "fs";
 
+// Decoder
+import { FLACDecoder } from "@wasm-audio-decoders/flac";
+
 const parser = new codec_parser("audio/flac");
-const frames = parser.parseAll(fs.readFileSync("E:/Media/Music/Detach.flac"));
+const file = fs.readFileSync(test_path);
+const frames = parser.parseAll(file);
 
 const frame = frames[0];
+let frame_list = [];
+
+for (let i = 0; i < 1000; i++) {
+    frame_list.push(frames[i]);
+}
+
 console.log(frame)
-app.get("/test", (req, res) => {
-    res.send(fs.readFileSync("E:/Media/Music/Detach.flac"));
+
+app.get("/test", async (req, res) => {
+    const decoder = new FLACDecoder();
+    await decoder.ready;
+
+    const data = await decoder.decodeFrames(frame_list);
+    console.log(data)
+
+
+    console.log(data);
+    res.json(data);
 })
 
 // Start server
