@@ -6,9 +6,10 @@ const song_field = doc.querySelector("#song");
 const audioCtx = new AudioContext();
 
 const player = {
-  volume: 0.5, // -3db
+  volume: 1,
+  speed: 1,
 
-  next_start_time: 0
+  next_start_time: 0,
 }
 
 
@@ -26,28 +27,25 @@ socket.addEventListener("open", () => {
 
 play_btn.addEventListener("click", () => {
   ws_request("play", {"song": song.value});
-  ws_request("next_buf");
-  ws_request("next_buf");
 })
 
 socket.addEventListener("message", async (event) => {
   const data = await event.data.arrayBuffer();
-  console.log(data)
   
-  //switch d
+  // Get type
   const data_view = new DataView(data)
-  
   const type = data_view.getUint32(0, true);
 
   switch (type) {
-    case 1: // Buffer data
+    case 0:
+      // Buffer data
       // Check order
       const buffer_index = data_view.getUint32(4, true);
       console.log(`Loading buffer #${buffer_index}`);
 
       // Create audio buffer
       console.log(data.byteLength)
-      const per_channel = ((data.byteLength / 4) - 8) / 2;
+      const per_channel = ((data.byteLength / 4) / 2) - 8;
       console.log("P?er channel " + per_channel)
       
       let channel_data = [
@@ -60,33 +58,38 @@ socket.addEventListener("message", async (event) => {
         channel_data[1][i] = data_view.getFloat32(4 * (i + per_channel) + 8, true);
       }
 
+      // Shift buffer and put in data
       active_buffer = 1 - active_buffer;
-      if (buffer_index == 0)
-        player.next_start_time = audioCtx.currentTime;
       
-      audio_buffer[active_buffer] = prepare_source(channel_data, per_channel, player.sampleRate);
+      audio_buffer[active_buffer] = prepare_source(channel_data, per_channel, player.sampleRate * player.speed);
       audio_buffer[active_buffer].source.start(player.next_start_time);
       player.next_start_time += audio_buffer[active_buffer].buffer.duration;
 
-      audio_buffer[1 - active_buffer].source.addEventListener('ended', () => {
+      audio_buffer[active_buffer].source.addEventListener('ended', () => {
         ws_request("next_buf");
       });
 
-      if (buffer_index == 0)
-        active_buffer = 1 - active_buffer;
-      
       return;
 
 
-    case 2: // Start song
+    case 1:
+      // Put song playback info and start song
       const info = get_json(data);
       player.sampleRate = info.sampleRate;
       player.totalLength = info.totalLength;
       player.bufferLength = info.bufferLength;
 
+      // Set up context
+      player.next_start_time = audioCtx.currentTime;
+
       // Start playback
       player.bufferLengthMS = (player.bufferLength / player.sampleRate) * 1000;
+      ws_request("next_buf");
+      ws_request("next_buf");
 
+      return;
+
+    case 10:
       return;
   }
 
@@ -136,11 +139,6 @@ function prepare_source(data, length, samplerate) {
   // Fill the buffer with the data
   for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
     const nowBuffering = buffer.getChannelData(channel);
-    console.log(data[channel])
-    //nowBuffering = data[channel];
-
-    //const interval = Math.floor(length / 20);
-//
     for (let i = 0; i < length; i++) {
       nowBuffering[i] = data[channel][i] * player.volume;
     }

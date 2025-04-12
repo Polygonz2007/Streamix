@@ -86,6 +86,10 @@ wss.on('connection', (ws, req) => {
                 const file_path = `${music_path}/${client.song}.flac`;
                 console.log('Loading "' + file_path + "'");
 
+                // Check if it exists
+                if (!fs.existsSync(file_path))
+                    return ws.send(prepare_json(2));
+
                 const parser = new codec_parser("audio/flac");
                 const file = fs.readFileSync(file_path);
                 const frames = parser.parseAll(file);
@@ -97,7 +101,7 @@ wss.on('connection', (ws, req) => {
                 client.frame_size = frames[0].samples;
                 console.log(frames[0])
 
-                return ws.send(prepare_json(2, {
+                return ws.send(prepare_json(1, {
                     "sampleRate": frames[0].header.sampleRate,
                     "totalLength": 44100,
 
@@ -144,7 +148,7 @@ wss.on('connection', (ws, req) => {
                 const channel_length = size * 2; // 4 bytes per sample, 2 channels
                 const buffer = Buffer.alloc(metadata_length + channel_length);
 
-                buffer.writeUInt32LE(1, 0);
+                buffer.writeUInt32LE(0, 0);
                 buffer.writeUInt32LE(client.frame_index, 4);
 
                 Buffer.from(decoded.channelData[0].buffer).copy(buffer, 8);
