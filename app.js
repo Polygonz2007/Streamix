@@ -95,7 +95,7 @@ wss.on('connection', (ws, req) => {
                 const frames = parser.parseAll(file);
                 client.frames = frames;
 
-                client.frame_index = 0;
+                client.frame_index = -1; // So that it starts and works like it should immediatley (maybe fix layter)
                 client.buffer_size = 16; // Move 16 frames per call (2s)
 
                 client.frame_size = frames[0].samples;
@@ -111,6 +111,9 @@ wss.on('connection', (ws, req) => {
                 }));
 
             case "next_buf":
+                // Update this immediatley
+                client.frame_index++;
+
                 const size = client.frame_size * client.buffer_size * 4; // 4 bytes per 32 bit sample
                 let sample_data = [];
 
@@ -123,8 +126,8 @@ wss.on('connection', (ws, req) => {
                     const frame_number = frame_offset + i;
                     //console.log(`Fetching frame ${frame_number}`)
 
-                    //if (frame_number > client.frames.length)
-                    //    continue;
+                    if (frame_number >= client.frames.length)
+                        continue;
 
                     const frame = client.frames[frame_number];
                     temp_frames.push(frame);
@@ -138,7 +141,7 @@ wss.on('connection', (ws, req) => {
 
                 //for (let channel = 0; channel < 2; channel++) {
                 if (temp_frames.length == 0)
-                    ws.send("Done")
+                    return ws.send("Done")
 
                 const decoded = await decoder.decodeFrames(temp_frames);
                 //}
@@ -155,7 +158,6 @@ wss.on('connection', (ws, req) => {
                 Buffer.from(decoded.channelData[1].buffer).copy(buffer, 8 + size);
 
                 // Send
-                client.frame_index++;
                 return ws.send(buffer);
         }
     });
