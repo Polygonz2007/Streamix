@@ -1,0 +1,10 @@
+:root {
+    --album-cover-size-max: 27rem;
+    --album-cover-size: min(min(75vw, 60vh), var(--album-cover-size-max));
+}
+
+@media only screen and (max-width: 500px) {
+    body {
+        zoom: 75%;
+    }
+}

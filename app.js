@@ -1,7 +1,8 @@
 
 // Configurqation of the app
 const config = {
-    port: 80
+    http_port: 80,
+    https_port: 443
 }
 
 // Get secrets
@@ -22,22 +23,31 @@ import express from "express";
 import session from "express-session"
 const app = express();
 
+//const private_key  = fs.readFileSync('certs/selfsigned.key', 'utf8');
+//const certificate = fs.readFileSync('certs/selfsigned.crt', 'utf8');
+//
+//var credentials = {key: private_key, cert: certificate};
+
 const session_parser = session({
     secret: process.env.session_secret,
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false } // If using HTTPS, set to true
+    cookie: { secure: true } // If using HTTPS, set to true
 });
 
 app.use(session_parser);
 
 // HTTP
 import http from "http";
-const server = http.createServer(app);
+const http_server = http.createServer(app);
 
 // Coced-parses
 import codec_parser from "codec-parser";
 import fs from "fs";
+
+// Metadata parser
+import { parseBuffer } from 'music-metadata';
+import { uint8ArrayToBase64 } from 'uint8array-extras';
 
 // Decoder
 import { FLACDecoder } from "@wasm-audio-decoders/flac";
@@ -48,7 +58,10 @@ const decoder = new FLACDecoder();
 import WebSocket, { WebSocketServer } from 'ws';
 global.wss = new WebSocketServer({ noServer: true });
 
-server.on('upgrade', function (request, socket, head) {
+http_server.on('upgrade', upgrade_websocket);
+//https_server.on('upgrade', upgrade_websocket);
+
+function upgrade_websocket(request, socket, head) {
     socket.on('error', console.error);
 
     session_parser(request, {}, () => {
@@ -64,7 +77,7 @@ server.on('upgrade', function (request, socket, head) {
             wss.emit('connection', ws, request);
         });
     });
-});
+}
 
 wss.on('connection', (ws, req) => {
 
@@ -95,17 +108,26 @@ wss.on('connection', (ws, req) => {
                 const frames = parser.parseAll(file);
                 client.frames = frames;
 
-                client.frame_index = -1; // So that it starts and works like it should immediatley (maybe fix layter)
-                client.buffer_size = 16; // Move 16 frames per call (2s)
+                const metadata = await parseBuffer(file);
+                const picture = metadata.common.picture[0];
 
-                client.frame_size = frames[0].samples;
-                console.log(frames[0])
+                const image_str = `data:${picture.format};base64,${uint8ArrayToBase64(picture.data)}`;
+
+                client.frame_index = -1; // So that it starts and works like it should immediatley (maybe fix layter)
+                client.frame_count_per_buffer = 16; // Move 16 frames per call (2s)
 
                 return ws.send(prepare_json(1, {
                     "sampleRate": frames[0].header.sampleRate,
-                    "totalLength": 44100,
+                    "duration": metadata.format.duration,
 
-                    "bufferLength": client.frame_size * client.buffer_size
+                    "bufferLength": 4096 * client.frame_count_per_buffer,
+
+                    "metadata": {
+                        "title": metadata.common.title,
+                        "artist": metadata.common.artist,
+                        "album": metadata.common.album,
+                        "cover": image_str
+                    }
 
                     // send various metadata and other stuff
                 }));
@@ -114,50 +136,54 @@ wss.on('connection', (ws, req) => {
                 // Update this immediatley
                 client.frame_index++;
 
-                const size = client.frame_size * client.buffer_size * 4; // 4 bytes per 32 bit sample
-                let sample_data = [];
-
-                let temp_frames = [];
+                let data_size = 0; // Calculate total size of the data
+                let data_frames = [];
 
                 console.log("Frame indx " + client.frame_index)
 
-                const frame_offset = client.frame_index * client.buffer_size;
-                for (let i = 0; i < client.buffer_size; i++) {
+                const frame_offset = client.frame_index * client.frame_count_per_buffer;
+                for (let i = 0; i < client.frame_count_per_buffer; i++) {
                     const frame_number = frame_offset + i;
-                    //console.log(`Fetching frame ${frame_number}`)
+                    console.log("checking frame " + frame_number)
 
                     if (frame_number >= client.frames.length)
-                        continue;
+                        continue; // Song is done
 
                     const frame = client.frames[frame_number];
-                    temp_frames.push(frame);
-                //    console.log(frame);
-                //
-                //    for (let channel = 0; channel < 2; channel++) {
-                //        sample_data[channel] = decoder.decodeFrames(frame);//new Int32Array(size);
-                //        //for (const sample of frame.channelData) { sample_data[channel].push(sample); }
-                //    }
+                    data_frames.push(frame.data);
+                    data_size += frame.data.length;
+
+                    console.log(`This frame has ${frame.data.length} bytes of data in it`);
                 }
 
-                //for (let channel = 0; channel < 2; channel++) {
-                if (temp_frames.length == 0)
+                // If we dont have any frames, the song is done
+                if (data_frames.length == 0)
                     return ws.send("Done")
 
-                const decoded = await decoder.decodeFrames(temp_frames);
-                //}
 
-                // Create buffer with message type and buffer index and audio data
-                const metadata_length = 8;
-                const channel_length = size * 2; // 4 bytes per sample, 2 channels
-                const buffer = Buffer.alloc(metadata_length + channel_length);
+                // Create buffer with message type and buffer index and frame data
+                const metadata_size = 6 + data_frames.length * 2;
+                const buffer = Buffer.alloc(metadata_size + data_size);
 
-                buffer.writeUInt32LE(0, 0);
-                buffer.writeUInt32LE(client.frame_index, 4);
+                buffer.writeUInt8(0, 0); // Type
+                buffer.writeUInt8(0, 1); // Format
+                buffer.writeUInt16LE(client.frame_index, 2); // Buffer index
+                buffer.writeUInt16LE(data_frames.length, 4); // Number of frames
 
-                Buffer.from(decoded.channelData[0].buffer).copy(buffer, 8);
-                Buffer.from(decoded.channelData[1].buffer).copy(buffer, 8 + size);
+                // Write frame lengths
+                for (let i = 0; i < data_frames.length; i++) {
+                    const length = data_frames[i].length;
+                    buffer.writeUint16LE(length, 6 + i * 2);
+                }
 
-                // Send
+                // Copy frame data into buffer
+                let offset = metadata_size;
+                for (let i = 0; i < data_frames.length; i++) {
+                    Buffer.from(data_frames[i]).copy(buffer, offset);
+                    offset += data_frames[i].length;
+                }
+
+                // Send to client
                 return ws.send(buffer);
         }
     });
@@ -171,6 +197,9 @@ wss.on('connection', (ws, req) => {
 // move to differtent plaves idiot
 // Converts JSON into a Buffer with type, along with JSON data for client
 function prepare_json(type, data) {
+    if (!data)
+        data = {};
+    
     const stringed = JSON.stringify(data);
     const buf = Buffer.alloc(4 + stringed.length);
 
@@ -183,6 +212,10 @@ function prepare_json(type, data) {
 
 // Start server
 app.use(express.static(global.public_path));
-server.listen(config.port, () => {
-    console.log(`Server running on 127.0.0.1:${config.port}.`);
+http_server.listen(config.http_port, () => {
+    console.log(`HTTP server running on ${config.http_port}.`);
 });
+
+//https_server.listen(config.https_port, () => {
+//    console.log(`HTTPS server running on port ${config.https_port}.`);
+//});

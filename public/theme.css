@@ -1,0 +1,31 @@
+:root {
+    /* Track details box */
+    --border-color: #FFF4;
+    --border-thickness: 0.15rem;
+}
+
+
+/** Font **/
+@font-face {
+    font-family: "Consolas";
+    src: url("/graphics/font/CONSOLA.TTF");
+}
+
+@font-face {
+    font-family: "Consolas";
+    src: url("/graphics/font/CONSOLAB.TTF");
+    font-weight: bold;
+}
+
+@font-face {
+    font-family: "Consolas";
+    src: url("/graphics/font/CONSOLAI.TTF");
+    font-style: italic;
+}
+
+@font-face {
+    font-family: "Consolas";
+    src: url("/graphics/font/CONSOLAZ.TTF");
+    font-weight: bold;
+    font-style: italic;
+}
