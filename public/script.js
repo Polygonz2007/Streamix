@@ -3,9 +3,16 @@ const doc = document;
 
 ///  ELEMENTS  ///
 // Controls
+const controls = doc.querySelector("#controls");
 const play_btn = doc.querySelector("#play");
 const song_field = doc.querySelector("#song");
 const pause_btn = doc.querySelector("#pause");
+
+const seekbar = {
+  time_played: doc.querySelector("#time-played"),
+  range: doc.querySelector("#seekbar"),
+  time_remaining: doc.querySelector("#time-remaining")
+}
 
 // Album cover
 const album_cover_img = doc.querySelector("#album-cover");
@@ -63,7 +70,6 @@ play_btn.addEventListener("click", () => {
 
 socket.addEventListener("message", async (event) => {
   const data = await event.data.arrayBuffer();
-  console.log(data)
   
   // Get type
   const data_view = new DataView(data)
@@ -78,14 +84,13 @@ socket.addEventListener("message", async (event) => {
 
       // Get buffer index, check order
       const buffer_index = data_view.getUint16(2, true);
-      console.log(`Loading buffer #${buffer_index}`);
 
       // Split data into frames
       let frames = [];
       const frame_count = data_view.getUint16(4, true);
       const metadata_size = 6 + frame_count * 2; // 4 bytes of metdata and then 2 * n bytes of lengths
 
-      console.log(`Buffer #${buffer_index}.\nFormat ${format}.\nThere are ${frame_count} frames in this packet.`);
+      console.log(`Buffer #${buffer_index}.\nFormat ${format}.\nThere are ${frame_count} frames in this packet. (${data.lenght} bytes)`);
 
       let offset = metadata_size;
       for (let i = 0; i < frame_count; i++) {
@@ -93,8 +98,6 @@ socket.addEventListener("message", async (event) => {
         const length = data_view.getUint16(6 + i * 2, true);
         frames.push(new Uint8Array(data, offset, length));
         offset += length;
-
-        console.log(`Frame #${i} is ${length} bytes.`);
       }
 
       //// Create audio buffer
@@ -113,12 +116,10 @@ socket.addEventListener("message", async (event) => {
       //}
 
       // Decode data
-      console.log(decoder.ready)
       if (!decoder.ready)
         return;
 
       const decoded = await decoder.decodeFrames(frames);
-      console.log(decoded)
 
       // Shift buffer and put in data
       active_buffer = buffer_index;// = 1 - active_buffer;
@@ -127,6 +128,7 @@ socket.addEventListener("message", async (event) => {
       audio_buffer[active_buffer].source.start(player.start_time + player.duration_time);//(buffer_index * player.bufferLengthSeconds / player.speed));
       if (buffer_index == 0) {
         player.start_time = audioCtx.currentTime;
+        resume();
         ws_request("next_buf");
       }
 
@@ -134,23 +136,33 @@ socket.addEventListener("message", async (event) => {
 
       audio_buffer[active_buffer].source.addEventListener('ended', () => {
         ws_request("next_buf");
+        update_seekbar()
       });
 
       return;
 
 
     case 1:
-      // Put song playback info and start song
+      // Put song playback info
       const info = get_json(data);
+      console.log(`Loading song "${info.metadata.title}".`)
+
       player.sampleRate = info.sampleRate;
       player.sampleDuration = info.duration * info.sampleRate;
+
       player.duration = info.duration;
+      player.start_time = 0;
+      player.duration_time = 0;
+
       player.bufferLength = info.bufferLength;
+      player.bufferLengthSeconds = player.bufferLength / player.sampleRate;
 
       // Set metadata display
       details_box.title.innerText = info.metadata.title;
-      details_box.artist.innerText = `by ${info.metadata.artist}`;
-      details_box.album.innerText = `from ${info.metadata.album}`;
+      details_box.artist.innerText = info.metadata.artist;
+
+      if (info.metadata.title !== info.metadata.album) // If album is not just title, display it
+        details_box.album.innerText = info.metadata.album;
 
       // Set album cover
       const picture_data = info.metadata.cover;
@@ -158,17 +170,35 @@ socket.addEventListener("message", async (event) => {
       background_img.src = picture_data;
 
       // Set up media session
-      //set_media_session(info.metadata);
+      set_media_session(info.metadata);
 
-      // Set up context
+      // Set up seekbar
+      seekbar.time_played.innerText = get_timestamp(player.duration_time);
+      seekbar.time_remaining.innerText = get_timestamp(player.duration_time - player.duration);
+
+      seekbar.range.min = 0;
+      seekbar.range.max = player.duration * 10; // 100ms accuracy
+      seekbar.range.value = player.duration_time * 10;
+
+      // Clear buffer
+      audio_buffer = [];
+      active_buffer = 0;
 
       // Start playback
-      player.bufferLengthSeconds = player.bufferLength / player.sampleRate;
       ws_request("next_buf");
 
       return;
 
-    case 10:
+    case 2:
+      // Remove metadata display
+      details_box.title.innerText = "...";
+      details_box.artist.innerText = "...";
+      details_box.album.innerText = "...";
+
+      // Remove album cover
+      album_cover_img.src = "/asset/logo/512/Winter.png";
+      background_img.src = "";
+
       return;
   }
 
@@ -229,28 +259,66 @@ function prepare_source(data, length, samplerate) {
   source.buffer = buffer;
   source.connect(audioCtx.destination);
 
-  console.log("Starting playback")
-
   return {buffer: buffer, source: source};
 }
 
 
 
-
+// Controls
 function pause() {
-  if (audioCtx.state == "running")
-    audioCtx.suspend();
-  else
-    audioCtx.resume();
+  audioCtx.suspend();
+  controls.classList.add("paused");
 }
 
-pause_btn.addEventListener("click", pause)
+function resume() {
+  audioCtx.resume();
+  controls.classList.remove("paused");
+}
+
+pause_btn.addEventListener("click", () => {
+  if (audioCtx.state == "running")
+    pause();
+  else
+    resume();
+})
 
 doc.addEventListener("keypress", (e) => {
   if (e.key == " ")
     pause()
 })
 
+
+
+function get_timestamp(seconds) {
+  // Flip if negative
+  let prefix = "";
+  if (seconds < 0) {
+    seconds = -seconds;
+    prefix = "-";
+  }
+
+  // Get
+  let m = Math.floor(seconds / 60);
+  let s = Math.floor(seconds % 60);
+
+  // Add leading 0s
+  m = m.toString();
+  s = s.toString();
+
+  if (m.length === 1)
+    m = "0" + m;
+  if (s.length === 1)
+    s = "0" + s;
+
+  // Add - if negative
+  return `${prefix}${m}:${s}`;
+}
+
+function update_seekbar() {
+  seekbar.time_played.innerText = get_timestamp(player.duration_time);
+  seekbar.time_remaining.innerText = get_timestamp(player.duration_time - player.duration);
+  seekbar.range.value = player.duration_time * 10;
+}
 
 
 // Server communication
@@ -278,51 +346,50 @@ function get_json(data) {
 }
 
 
-//
-//
-//
-//
-//
-//function set_media_session(metadata) {
-//  if (navigator.mediaSession) {
-//    navigator.mediaSession.metadata = new MediaMetadata({
-//      title: metadata.title,
-//      artist: metadata.artist,
-//      album: metadata.album,
-//      artwork: [
-//        {
-//          src: metadata.cover,
-//          sizes: "96x96",
-//          type: "image/png"
-//        }
-//      ]
-//    });
-//
-//    navigator.mediaSession.setActionHandler("play", () => {
-//      audioCtx.resume();
-//      update_media_session_position();
-//      navigator.mediaSession.playbackState = 'playing';
-//    });
-//
-//    navigator.mediaSession.setActionHandler("pause", () => {
-//      audioCtx.suspend();
-//      update_media_session_position();
-//      navigator.mediaSession.playbackState = 'paused';
-//    });
-//
-//    update_media_session_position();
-//  }
-//}
-//
-//function update_media_session_position() {
-//  navigator.mediaSession.setPositionState({
-//    duration: player.duration,
-//    playbackRate: player.speed,
-//    position: player.duration_time
-//  });
-//}
-//
-//
+
+
+
+
+
+function set_media_session(metadata) {
+  if (navigator.mediaSession) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: metadata.title,
+      artist: metadata.artist,
+      album: metadata.album,
+      artwork: [
+        {
+          src: metadata.cover,
+          sizes: "96x96",
+          type: "image/png"
+        }
+      ]
+    });
+
+    navigator.mediaSession.setActionHandler("play", () => {
+      audioCtx.resume();
+      update_media_session_position();
+      navigator.mediaSession.playbackState = 'playing';
+    });
+
+    navigator.mediaSession.setActionHandler("pause", () => {
+      audioCtx.suspend();
+      update_media_session_position();
+      navigator.mediaSession.playbackState = 'paused';
+    });
+
+    update_media_session_position();
+  }
+}
+
+function update_media_session_position() {
+  navigator.mediaSession.setPositionState({
+    duration: player.duration,
+    playbackRate: player.speed,
+    position: player.duration_time
+  });
+}
+
 
 
 

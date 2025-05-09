@@ -88,20 +88,20 @@ wss.on('connection', (ws, req) => {
 
         const client = req.session;
 
-        console.log(data)
-
         // Functions
         const type = data.type;
         switch (type) {
             case "play":
                 client.song = data.song;
+                console.log(`\nRequest for song "${client.song}".`);
 
                 const file_path = `${music_path}/${client.song}.flac`;
-                console.log('Loading "' + file_path + "'");
-
+    
                 // Check if it exists
                 if (!fs.existsSync(file_path))
                     return ws.send(prepare_json(2));
+
+                console.log(`File found for "${client.song}" at "${file_path}". Parsing.`);
 
                 const parser = new codec_parser("audio/flac");
                 const file = fs.readFileSync(file_path);
@@ -109,12 +109,17 @@ wss.on('connection', (ws, req) => {
                 client.frames = frames;
 
                 const metadata = await parseBuffer(file);
-                const picture = metadata.common.picture[0];
 
-                const image_str = `data:${picture.format};base64,${uint8ArrayToBase64(picture.data)}`;
+                let image_str = "";
+                if (metadata.common.picture) {
+                    const picture = metadata.common.picture[0];
+                    image_str = `data:${picture.format};base64,${uint8ArrayToBase64(picture.data)}`;
+                }
 
                 client.frame_index = -1; // So that it starts and works like it should immediatley (maybe fix layter)
-                client.frame_count_per_buffer = 16; // Move 16 frames per call (2s)
+                client.frame_count_per_buffer = 16; // Move 16 frames per call (1.5s)
+
+                console.log(`"${file_path}" parsed.\n`);
 
                 return ws.send(prepare_json(1, {
                     "sampleRate": frames[0].header.sampleRate,
@@ -139,26 +144,20 @@ wss.on('connection', (ws, req) => {
                 let data_size = 0; // Calculate total size of the data
                 let data_frames = [];
 
-                console.log("Frame indx " + client.frame_index)
-
                 const frame_offset = client.frame_index * client.frame_count_per_buffer;
                 for (let i = 0; i < client.frame_count_per_buffer; i++) {
                     const frame_number = frame_offset + i;
-                    console.log("checking frame " + frame_number)
-
                     if (frame_number >= client.frames.length)
                         continue; // Song is done
 
                     const frame = client.frames[frame_number];
                     data_frames.push(frame.data);
                     data_size += frame.data.length;
-
-                    console.log(`This frame has ${frame.data.length} bytes of data in it`);
                 }
 
                 // If we dont have any frames, the song is done
                 if (data_frames.length == 0)
-                    return ws.send("Done")
+                    return ws.send(prepare_json(2)); // Signal that the song is done
 
 
                 // Create buffer with message type and buffer index and frame data

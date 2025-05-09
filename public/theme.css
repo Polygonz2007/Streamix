@@ -1,31 +1,72 @@
-:root {
-    /* Track details box */
+
+
+:root { /**  SETTINGS  **/
+    /* Colors */
+    --color-background: #111;
+    --color-foreground: #FFF;
+
+    ---color-weak: #FFF4;
+    --color-light: #FFF8;
+    --color-middle: #FFFB;
+    --color-normal: #FFFE;
+    --color-strong: #FFFF;
+
     --border-color: #FFF4;
-    --border-thickness: 0.15rem;
+    
+
+    /* Text / Effect size */
+    --text-size-title: min(2.2rem, 2.2vh);
+    --text-size-subtitle: min(1.3rem, 1.3vh);
+
+    --border-thickness: 0.2rem;
+
+
+    /* Fancy effects */
+    --background-image-effect: contrast(125%) brightness(75%) saturate(100%);
+    --background-image-blur: max(7vw, 7vh);
+
+
+    /* Calculated values */
+    --border-half: solid var(--border-color) calc(var(--border-thickness) / 2);
+    --border-default: solid var(--border-color) var(--border-thickness);
 }
 
+/** Classes for colors **/
+.color-weak { color: var(--color-weak); }
+.color-light { color: var(--color-light); }
+.color-middle { color: var(--color-middle); }
+.color-normal { color: var(--color-normal); }
+.color-strong { color: var(--color-strong); }
 
 /** Font **/
 @font-face {
     font-family: "Consolas";
-    src: url("/graphics/font/CONSOLA.TTF");
+    src: url("/asset/font/CONSOLA.TTF");
 }
 
 @font-face {
     font-family: "Consolas";
-    src: url("/graphics/font/CONSOLAB.TTF");
+    src: url("/asset/font/CONSOLAB.TTF");
     font-weight: bold;
 }
 
 @font-face {
     font-family: "Consolas";
-    src: url("/graphics/font/CONSOLAI.TTF");
+    src: url("/asset/font/CONSOLAI.TTF");
     font-style: italic;
 }
 
 @font-face {
     font-family: "Consolas";
-    src: url("/graphics/font/CONSOLAZ.TTF");
+    src: url("/asset/font/CONSOLAZ.TTF");
     font-weight: bold;
     font-style: italic;
+}
+
+/** Global **/
+body {
+    background-color: #000;
+    color: var(--color-normal);
+
+    font-family: "Consolas";
 }

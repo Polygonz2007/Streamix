@@ -1,9 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta charset="UTF-8"> <!-- Text -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0; viewport-fit=cover"/> <!-- Prevent zooming -->
+
+        <!-- Title and icon -->
         <title>Streamix</title>
+        <link rel="icon" type="image/x-icon" href="/asset/logo/192/Winter Round.png">
 
         <!-- Global CSS -->
         <link rel="stylesheet" href="theme.css">
@@ -19,13 +22,8 @@
     </head>
 
     <body>
-        <h1>Welcome to Streamix</h1>
-
-        <p>Listen to stuff</p>
         <input type="text" placeholder="Song name" id="song" />
         <input type="button" value="Get and start" id="play" />
-
-        <input type="button" value="Play / Pause" id="pause" />
 
         <div id="background">
             <img id="background-image" src="">
@@ -33,11 +31,33 @@
         </div>
 
         <div id="info">
-            <img id="album-cover" src="">
-            <h1 id="title">Song Name</h1>
+            <img id="album-cover" src="asset//logo/512/Winter.png">
+            <h1 id="title"></h1>
+
             <hr>
-            <h2 id="artist">Artist Name</h2>
-            <h2 id="album">Album Name</h2>
+
+            <h2> <!-- Artist -->
+                <span class="color-middle">by </span>
+                <span id="artist">...</span>
+            </h2>
+
+            <h2> <!-- Album -->
+                <span class="color-middle">from </span>
+                <span id="album">...</span>
+            </h2>
+        </div>
+
+        <!-- Paused: not playing, Active: a song is loaded -->
+        <div id="controls" class="paused">
+            <div id="seekbar-container">
+                <span id="time-played">0:00</span>
+                <input id="seekbar" type="range" />
+                <span id="time-remaining">-0:00</span>
+            </div>
+
+            <div id="control-buttons">
+                <input type="button" class="image" id="pause" />
+            </div>
         </div>
         
     </body>
