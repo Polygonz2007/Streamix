@@ -24,6 +24,7 @@
     <body>
         <input type="text" placeholder="Song name" id="song" />
         <input type="button" value="Get and start" id="play" />
+        <br> <input type="text" placeholder="Last fm command" id="lastfm">
 
         <div id="background">
             <img id="background-image" src="">
@@ -32,7 +33,7 @@
 
         <div id="info">
             <img id="album-cover" src="asset//logo/512/Winter.png">
-            <h1 id="title"></h1>
+            <h1 id="title">...</h1>
 
             <hr>
 
@@ -51,7 +52,7 @@
         <div id="controls" class="paused">
             <div id="seekbar-container">
                 <span id="time-played">0:00</span>
-                <input id="seekbar" type="range" />
+                <input id="seekbar" type="range" step="any" />
                 <span id="time-remaining">-0:00</span>
             </div>
 

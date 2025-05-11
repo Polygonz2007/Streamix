@@ -157,6 +157,9 @@ socket.addEventListener("message", async (event) => {
       player.bufferLength = info.bufferLength;
       player.bufferLengthSeconds = player.bufferLength / player.sampleRate;
 
+      // Last fm...
+      doc.querySelector("#lastfm").setAttribute("value", `.sb ${info.metadata.artist} | ${info.metadata.title} | ${info.metadata.album}`);
+
       // Set metadata display
       details_box.title.innerText = info.metadata.title;
       details_box.artist.innerText = info.metadata.artist;
@@ -177,8 +180,8 @@ socket.addEventListener("message", async (event) => {
       seekbar.time_remaining.innerText = get_timestamp(player.duration_time - player.duration);
 
       seekbar.range.min = 0;
-      seekbar.range.max = player.duration * 10; // 100ms accuracy
-      seekbar.range.value = player.duration_time * 10;
+      seekbar.range.max = player.duration;
+      seekbar.range.value = player.duration_time;
 
       // Clear buffer
       audio_buffer = [];
@@ -283,8 +286,12 @@ pause_btn.addEventListener("click", () => {
 })
 
 doc.addEventListener("keypress", (e) => {
-  if (e.key == " ")
-    pause()
+  if (e.key == " ") {
+    if (audioCtx.state == "running")
+      pause();
+    else
+      resume();
+  }
 })
 
 
@@ -317,7 +324,7 @@ function get_timestamp(seconds) {
 function update_seekbar() {
   seekbar.time_played.innerText = get_timestamp(player.duration_time);
   seekbar.time_remaining.innerText = get_timestamp(player.duration_time - player.duration);
-  seekbar.range.value = player.duration_time * 10;
+  seekbar.range.value = player.duration_time;
 }
 
 

@@ -1,5 +1,5 @@
 :root {
-    --album-cover-size-max: min(32rem);
+    --album-cover-size-max: min(28rem);
     --album-cover-size: min(min(80vw, 65vh), var(--album-cover-size-max));
 
     --controls-width: 48rem;
@@ -8,6 +8,6 @@
 /* Phone */
 @media only screen and (max-width: 500px) {
     body {
-        zoom: 70%;
+        zoom: 80%;
     }
 }

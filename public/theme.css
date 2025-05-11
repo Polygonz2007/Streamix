@@ -3,15 +3,17 @@
 :root { /**  SETTINGS  **/
     /* Colors */
     --color-background: #111;
+    --color-background-glass: #1118;
     --color-foreground: #FFF;
+    --color-foreground-glass: #FFF8;
 
-    ---color-weak: #FFF4;
+    --color-weak: #FFF4;
     --color-light: #FFF8;
     --color-middle: #FFFB;
     --color-normal: #FFFE;
     --color-strong: #FFFF;
 
-    --border-color: #FFF4;
+    --border-color: #FFF2;
     
 
     /* Text / Effect size */
@@ -22,12 +24,12 @@
 
 
     /* Fancy effects */
-    --background-image-effect: contrast(125%) brightness(75%) saturate(100%);
-    --background-image-blur: max(7vw, 7vh);
+    --background-image-effect: contrast(110%) brightness(85%) saturate(120%);
+    --background-image-blur: max(14vw, 14vh);
 
 
     /* Calculated values */
-    --border-half: solid var(--border-color) calc(var(--border-thickness) / 2);
+    --border-half: solid var(--border-color) calc(var(--border-thickness) / 1.777);
     --border-default: solid var(--border-color) var(--border-thickness);
 }
 
