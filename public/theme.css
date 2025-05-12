@@ -24,8 +24,8 @@
 
 
     /* Fancy effects */
-    --background-image-effect: contrast(110%) brightness(85%) saturate(120%);
-    --background-image-blur: max(14vw, 14vh);
+    --background-image-effect: contrast(110%) brightness(90%) saturate(120%);
+    --background-image-blur: max(5vw, 5vh);
 
 
     /* Calculated values */
