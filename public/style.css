@@ -19,7 +19,7 @@
 
     border: var(--border-default);
     box-shadow: #0006 0 0 12rem;
-    border-radius: 1rem;
+    border-radius: 3%;
 }
 
 h1 {
@@ -71,8 +71,8 @@ hr {
 }
 
 #background-blur  {
-    backdrop-filter: blur(var(--background-image-blur));
-    -webkit-backdrop-filter: blur(var(--background-image-blur));
+    backdrop-filter: blur(var(--background-image-blur)) contrast(85%);
+    -webkit-backdrop-filter: blur(var(--background-image-blur)) contrast(85%);
     z-index: -998;
 }
 
@@ -141,6 +141,9 @@ input.image:active {
 #controls.paused {
     #pause { background-image: url("/asset/controls/Play.svg"); }
 }
+
+#previous { background-image: url("/asset/controls/Previous.svg"); }
+#next { background-image: url("/asset/controls/Next.svg"); }
 
 /* Phone Only */
 @media only screen and (max-width: 500px) {

@@ -22,9 +22,7 @@
     </head>
 
     <body>
-        <input type="text" placeholder="Song name" id="song" />
-        <input type="button" value="Get and start" id="play" />
-        <br> <input type="text" placeholder="Last fm command" id="lastfm">
+        <input type="text" placeholder="Last.fm command" id="lastfm">
 
         <div id="background">
             <img id="background-image" src="">
@@ -33,18 +31,18 @@
 
         <div id="info">
             <img id="album-cover" src="asset//logo/512/Winter.png">
-            <h1 id="title">...</h1>
+            <h1 id="title" class="text">...</h1>
 
             <hr>
 
-            <h2> <!-- Artist -->
+            <h2 id="artist"> <!-- Artist -->
                 <span class="color-middle">by </span>
-                <span id="artist">...</span>
+                <span class="text">...</span>
             </h2>
 
-            <h2> <!-- Album -->
+            <h2 id="album"> <!-- Album -->
                 <span class="color-middle">from </span>
-                <span id="album">...</span>
+                <span class="text">...</span>
             </h2>
         </div>
 
@@ -57,7 +55,9 @@
             </div>
 
             <div id="control-buttons">
+                <input type="button" class="image" id="previous" />
                 <input type="button" class="image" id="pause" />
+                <input type="button" class="image" id="next" />
             </div>
         </div>
         

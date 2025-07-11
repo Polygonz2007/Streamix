@@ -11,6 +11,18 @@ dotenv.config();
 
 const music_path = process.env.music_path;
 
+// Imports
+import fs from "fs";
+import * as stats from "./src/stats.js";
+import * as database from "./src/database.js";
+import { Indexer } from "./src/indexer.js";
+
+database.open();
+
+Indexer.scan(process.env.music_path);
+
+
+
 // Path
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -38,12 +50,11 @@ const session_parser = session({
 app.use(session_parser);
 
 // HTTP
-import http from "http";
+import http, { Server } from "http";
 const http_server = http.createServer(app);
 
-// Coced-parses
+// Cocec-parser
 import codec_parser from "codec-parser";
-import fs from "fs";
 
 // Metadata parser
 import { parseBuffer } from 'music-metadata';
@@ -52,6 +63,8 @@ import { uint8ArrayToBase64 } from 'uint8array-extras';
 // Decoder
 import { FLACDecoder } from "@wasm-audio-decoders/flac";
 const decoder = new FLACDecoder();
+
+
 
 
 // WebSockets
@@ -95,7 +108,7 @@ wss.on('connection', (ws, req) => {
                 client.song = data.song;
                 console.log(`\nRequest for song "${client.song}".`);
 
-                const file_path = `${music_path}/${client.song}.flac`;
+                const file_path = database.get_track_path(client.song);
     
                 // Check if it exists
                 if (!fs.existsSync(file_path))
@@ -117,7 +130,7 @@ wss.on('connection', (ws, req) => {
                 }
 
                 client.frame_index = -1; // So that it starts and works like it should immediatley (maybe fix layter)
-                client.frame_count_per_buffer = 16; // Move 16 frames per call (1.5s)
+                client.frame_count_per_buffer = 128; // Move 16 frames per call (1.5s) / 128 (12s)
 
                 console.log(`"${file_path}" parsed.\n`);
 
@@ -183,6 +196,7 @@ wss.on('connection', (ws, req) => {
                 }
 
                 // Send to client
+                stats.log_event("buffer_request");
                 return ws.send(buffer);
         }
     });
@@ -209,6 +223,25 @@ function prepare_json(type, data) {
 }
 
 
+
+// Stats
+app.get("*", (req, res, next) => {
+    stats.log_event("http_get");
+    return next();
+});
+
+// Routes
+app.get("/stats", (req, res) => {
+    return res.send(stats.stats);
+});
+
+app.get("/id/img.jpg")
+
+
+
+
+
+
 // Start server
 app.use(express.static(global.public_path));
 http_server.listen(config.http_port, () => {
@@ -218,3 +251,13 @@ http_server.listen(config.http_port, () => {
 //https_server.listen(config.https_port, () => {
 //    console.log(`HTTPS server running on port ${config.https_port}.`);
 //});
+
+// Close server
+process.on('SIGTERM', shut_down);
+process.on('SIGINT', shut_down);
+
+function shut_down() {
+    console.log("Stopping!");
+    console.log("Saving stats...")
+    process.exit(0);
+}

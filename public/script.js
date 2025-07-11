@@ -4,8 +4,9 @@ const doc = document;
 ///  ELEMENTS  ///
 // Controls
 const controls = doc.querySelector("#controls");
-const play_btn = doc.querySelector("#play");
-const song_field = doc.querySelector("#song");
+const next_btn = doc.querySelector("#next");
+const prev_btn = doc.querySelector("#previous");
+
 const pause_btn = doc.querySelector("#pause");
 
 const seekbar = {
@@ -21,8 +22,10 @@ const background_img = doc.querySelector("#background-image");
 // Track details
 let details_box = {};
 details_box.title = doc.querySelector("#title");
-details_box.artist = doc.querySelector("#artist");
-details_box.album = doc.querySelector("#album");
+details_box.artist = doc.querySelector("#artist > .text");
+details_box.album = doc.querySelector("#album > .text");
+
+details_box.album_full = doc.querySelector("#album");
 
 
 ///  DECODER ///
@@ -46,14 +49,25 @@ else
 const player = {
   volume: 1,
   speed: 1,
+  song_id: 0,
 
   start_time: 0,
   duration_time: 0
 }
 
+// Replace with something that makes more sense and stuff, actually just replace everything here
+next_btn.addEventListener("click", () => {
+  player.song_id++;
+  ws_request("play", {"song": player.song_id});
+});
+
+prev_btn.addEventListener("click", () => {
+  player.song_id--;
+  ws_request("play", {"song": player.song_id});
+});
 
 let audio_buffer = [];
-let active_buffer = 0;
+let active_buffer = -1;
 
 
 // Websocket
@@ -63,10 +77,6 @@ const socket = new WebSocket(url);
 socket.addEventListener("open", () => {
   // Yay
 });
-
-play_btn.addEventListener("click", () => {
-  ws_request("play", {"song": song.value});
-})
 
 socket.addEventListener("message", async (event) => {
   const data = await event.data.arrayBuffer();
@@ -84,13 +94,15 @@ socket.addEventListener("message", async (event) => {
 
       // Get buffer index, check order
       const buffer_index = data_view.getUint16(2, true);
+      if (buffer_index != active_buffer + 1)
+        return;
 
       // Split data into frames
       let frames = [];
       const frame_count = data_view.getUint16(4, true);
       const metadata_size = 6 + frame_count * 2; // 4 bytes of metdata and then 2 * n bytes of lengths
 
-      console.log(`Buffer #${buffer_index}.\nFormat ${format}.\nThere are ${frame_count} frames in this packet. (${data.lenght} bytes)`);
+      console.log(`Buffer #${buffer_index}.\nFormat ${format}.\nThere are ${frame_count} frames in this packet. (${data.length} bytes)`);
 
       let offset = metadata_size;
       for (let i = 0; i < frame_count; i++) {
@@ -143,6 +155,14 @@ socket.addEventListener("message", async (event) => {
 
 
     case 1:
+      for (let i = 0; i < audio_buffer.length; i++) {
+        if (audio_buffer[i])
+          audio_buffer[i].source.stop();
+      }
+
+      audio_buffer = [];
+      audioCtx.currentTime = 0;
+
       // Put song playback info
       const info = get_json(data);
       console.log(`Loading song "${info.metadata.title}".`)
@@ -163,9 +183,7 @@ socket.addEventListener("message", async (event) => {
       // Set metadata display
       details_box.title.innerText = info.metadata.title;
       details_box.artist.innerText = info.metadata.artist;
-
-      if (info.metadata.title !== info.metadata.album) // If album is not just title, display it
-        details_box.album.innerText = info.metadata.album;
+      details_box.album.innerText = info.metadata.album;
 
       // Set album cover
       const picture_data = info.metadata.cover;
@@ -185,7 +203,7 @@ socket.addEventListener("message", async (event) => {
 
       // Clear buffer
       audio_buffer = [];
-      active_buffer = 0;
+      active_buffer = -1;
 
       // Start playback
       ws_request("next_buf");
@@ -322,10 +340,13 @@ function get_timestamp(seconds) {
 }
 
 function update_seekbar() {
-  seekbar.time_played.innerText = get_timestamp(player.duration_time);
-  seekbar.time_remaining.innerText = get_timestamp(player.duration_time - player.duration);
-  seekbar.range.value = player.duration_time;
+  const current_time = audioCtx.currentTime - player.start_time;
+  seekbar.time_played.innerText = get_timestamp(current_time);
+  seekbar.time_remaining.innerText = get_timestamp(current_time - player.duration);
+  seekbar.range.value = current_time;
 }
+
+setInterval(update_seekbar, 100);
 
 
 // Server communication
@@ -375,14 +396,14 @@ function set_media_session(metadata) {
 
     navigator.mediaSession.setActionHandler("play", () => {
       audioCtx.resume();
-      update_media_session_position();
-      navigator.mediaSession.playbackState = 'playing';
+      //update_media_session_position();
+      //navigator.mediaSession.playbackState = 'playing';
     });
 
     navigator.mediaSession.setActionHandler("pause", () => {
       audioCtx.suspend();
-      update_media_session_position();
-      navigator.mediaSession.playbackState = 'paused';
+      //update_media_session_position();
+      //navigator.mediaSession.playbackState = 'paused';
     });
 
     update_media_session_position();
