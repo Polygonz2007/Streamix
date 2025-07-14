@@ -107,7 +107,6 @@ socket.addEventListener("message", async (event) => {
       for (let i = 0; i < frame_count; i++) {
         // Get and push frame to array
         const length = data_view.getUint16(6 + i * 2, true);
-        console.log(`Frame length: ${length}\nFrame index: ${i}\nStart ${offset}\nEnd ${offset+length}`);
         frames.push(new Uint8Array(data, offset, length));
         offset += length;
       }
@@ -171,7 +170,7 @@ socket.addEventListener("message", async (event) => {
       details_box.album.innerText = info.album.name;
 
       // Set album cover
-      const cover_url = `/album/${info.album.id}/img.jpg`;
+      const cover_url = `/album/${info.album.id}/512`;
       album_cover_img.src = cover_url;
       background_img.src = cover_url;
 

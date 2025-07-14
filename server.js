@@ -62,8 +62,10 @@ import { uint8ArrayToBase64 } from 'uint8array-extras';
 import { FLACDecoder } from "@wasm-audio-decoders/flac";
 const decoder = new FLACDecoder();
 
-
-
+// Image blob reduce
+import ImageBlobReduce from "image-blob-reduce";
+const reducer = new ImageBlobReduce();
+console.log(reducer)
 
 // WebSockets
 import WebSocket, { WebSocketServer } from 'ws';
@@ -202,7 +204,7 @@ app.get("/stats", (req, res) => {
 
 // Albums
 // Images
-app.get("/album/:album_id/img.jpg", (req, res) => {
+app.get("/album/:album_id/:filename", (req, res) => {
     const album_id = req.params.album_id;
     if (!album_id)
         return res.sendStatus(404);
@@ -214,13 +216,29 @@ app.get("/album/:album_id/img.jpg", (req, res) => {
         // Reply with default image
         return res.sendFile(path.join(global.public_path, "asset/logo/512/Deep.png"));
     }
-        
+     
+    // Make sure size is within reason
+    if (!req.params.filename.endsWith(".jpg"))
+        return res.sendStatus(404);
 
-    return res.contentType("image/jpeg").send(img);
+    let size = parseInt(req.params.filename);
+    if (!size)
+        return res.sendStatus(404).send(`Please provide a size for the image, e.g. like this: "/album/17/512.jpg".`);
+
+    if (size < 32) // Too small
+        size = 32;
+
+    if (size > 512) // Too big
+        size = 512;
+
+    console.log(size)
+
+    // Scale image to desired size and send
+    reducer.toBlob(img, { max: size }).then(blob => {
+        return res.contentType("image/jpeg").send(blob);
+    });
+    console.log("does this run...")
 });
-
-
-
 
 
 
