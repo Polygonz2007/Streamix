@@ -9,10 +9,8 @@ const config = {
 import dotenv from "dotenv";
 dotenv.config();
 
-const music_path = process.env.music_path;
-
 // Imports
-import fs from "fs";
+import fs, { glob } from "fs";
 import * as stats from "./src/stats.js";
 import * as database from "./src/database.js";
 import { Indexer } from "./src/indexer.js";
@@ -105,95 +103,62 @@ wss.on('connection', (ws, req) => {
         const type = data.type;
         switch (type) {
             case "play":
-                client.song = data.song;
-                console.log(`\nRequest for song "${client.song}".`);
+                client.track_id = data.track_id;
+                console.log(`\nRequest for track #${client.track_id}`);
 
-                const file_path = database.get_track_path(client.song);
-    
-                // Check if it exists
-                if (!fs.existsSync(file_path))
-                    return ws.send(prepare_json(2));
+                const metadata = database.get_track_meta(client.track_id);
+                client.block_index = -1; // So that it starts and works like it should immediatley (maybe fix layter)
 
-                console.log(`File found for "${client.song}" at "${file_path}". Parsing.`);
-
-                const parser = new codec_parser("audio/flac");
-                const file = fs.readFileSync(file_path);
-                const frames = parser.parseAll(file);
-                client.frames = frames;
-
-                const metadata = await parseBuffer(file);
-
-                let image_str = "";
-                if (metadata.common.picture) {
-                    const picture = metadata.common.picture[0];
-                    image_str = `data:${picture.format};base64,${uint8ArrayToBase64(picture.data)}`;
-                }
-
-                client.frame_index = -1; // So that it starts and works like it should immediatley (maybe fix layter)
-                client.frame_count_per_buffer = 128; // Move 16 frames per call (1.5s) / 128 (12s)
-
-                console.log(`"${file_path}" parsed.\n`);
-
+                // Tell client about their precious song (replace with immediate first buffer)
                 return ws.send(prepare_json(1, {
-                    "sampleRate": frames[0].header.sampleRate,
-                    "duration": metadata.format.duration,
+                    "sampleRate": metadata.sample_rate,
+                    "duration": metadata.duration,
 
                     "bufferLength": 4096 * client.frame_count_per_buffer,
 
-                    "metadata": {
-                        "title": metadata.common.title,
-                        "artist": metadata.common.artist,
-                        "album": metadata.common.album,
-                        "cover": image_str
-                    }
+                    "track": {
+                        "name": metadata.title,
+                        "id": metadata.track_id,
+                        "number": metadata.track_number
+                    },
 
-                    // send various metadata and other stuff
+                    "album": {
+                        "name": metadata.album,
+                        "id": metadata.album_id
+                    },
+
+                    "artist": {
+                        "name": metadata.artist,
+                        "id": metadata.artist_id
+                    }
                 }));
 
             case "next_buf":
                 // Update this immediatley
-                client.frame_index++;
+                client.block_index++;
 
-                let data_size = 0; // Calculate total size of the data
-                let data_frames = [];
-
-                const frame_offset = client.frame_index * client.frame_count_per_buffer;
-                for (let i = 0; i < client.frame_count_per_buffer; i++) {
-                    const frame_number = frame_offset + i;
-                    if (frame_number >= client.frames.length)
-                        continue; // Song is done
-
-                    const frame = client.frames[frame_number];
-                    data_frames.push(frame.data);
-                    data_size += frame.data.length;
-                }
+                const result = database.get_track_data(client.track_id, 0, client.block_index);
 
                 // If we dont have any frames, the song is done
-                if (data_frames.length == 0)
+                if (!result)
                     return ws.send(prepare_json(2)); // Signal that the song is done
 
+                const num_frames = result.num_frames;
+                const block_size = result.block_size;
+                const block_data = result.block_data;
 
                 // Create buffer with message type and buffer index and frame data
-                const metadata_size = 6 + data_frames.length * 2;
-                const buffer = Buffer.alloc(metadata_size + data_size);
+                const metadata_size = 6;
+                const buffer = Buffer.alloc(metadata_size + block_size);
 
                 buffer.writeUInt8(0, 0); // Type
                 buffer.writeUInt8(0, 1); // Format
-                buffer.writeUInt16LE(client.frame_index, 2); // Buffer index
-                buffer.writeUInt16LE(data_frames.length, 4); // Number of frames
+                buffer.writeUInt16LE(client.block_index, 2); // Buffer index
+                buffer.writeUInt16LE(num_frames, 4); // Number of frames
 
-                // Write frame lengths
-                for (let i = 0; i < data_frames.length; i++) {
-                    const length = data_frames[i].length;
-                    buffer.writeUint16LE(length, 6 + i * 2);
-                }
-
-                // Copy frame data into buffer
+                // Copy data into buffer (frame lengths and data)
                 let offset = metadata_size;
-                for (let i = 0; i < data_frames.length; i++) {
-                    Buffer.from(data_frames[i]).copy(buffer, offset);
-                    offset += data_frames[i].length;
-                }
+                Buffer.from(block_data).copy(buffer, offset);
 
                 // Send to client
                 stats.log_event("buffer_request");
@@ -235,7 +200,24 @@ app.get("/stats", (req, res) => {
     return res.send(stats.stats);
 });
 
-app.get("/id/img.jpg")
+// Albums
+// Images
+app.get("/album/:album_id/img.jpg", (req, res) => {
+    const album_id = req.params.album_id;
+    if (!album_id)
+        return res.sendStatus(404);
+
+    console.log("Fetching album cover for album #" + album_id + ".");
+
+    const img = database.get_album_image(album_id);
+    if (!img) {
+        // Reply with default image
+        return res.sendFile(path.join(global.public_path, "asset/logo/512/Deep.png"));
+    }
+        
+
+    return res.contentType("image/jpeg").send(img);
+});
 
 
 

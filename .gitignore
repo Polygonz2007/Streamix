@@ -1,4 +1,11 @@
+# Project stuff
 .env
 node_modules
 
-certs
+# HTTPS certificates
+certs/*
+
+# Database
+src/streamix.db
+src/streamix.db-shm
+src/streamix.db-wal

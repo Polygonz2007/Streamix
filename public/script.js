@@ -52,18 +52,19 @@ const player = {
   song_id: 0,
 
   start_time: 0,
-  duration_time: 0
+  duration_time: 0,
+  headroom: 0 // the amount of buffers after this one
 }
 
 // Replace with something that makes more sense and stuff, actually just replace everything here
 next_btn.addEventListener("click", () => {
   player.song_id++;
-  ws_request("play", {"song": player.song_id});
+  ws_request("play", {"track_id": player.song_id});
 });
 
 prev_btn.addEventListener("click", () => {
   player.song_id--;
-  ws_request("play", {"song": player.song_id});
+  ws_request("play", {"track_id": player.song_id});
 });
 
 let audio_buffer = [];
@@ -100,32 +101,16 @@ socket.addEventListener("message", async (event) => {
       // Split data into frames
       let frames = [];
       const frame_count = data_view.getUint16(4, true);
-      const metadata_size = 6 + frame_count * 2; // 4 bytes of metdata and then 2 * n bytes of lengths
-
-      console.log(`Buffer #${buffer_index}.\nFormat ${format}.\nThere are ${frame_count} frames in this packet. (${data.length} bytes)`);
+      const metadata_size = 6 + frame_count * 2; // 6 bytes of metdata and then 2 * n bytes of lengths
 
       let offset = metadata_size;
       for (let i = 0; i < frame_count; i++) {
         // Get and push frame to array
         const length = data_view.getUint16(6 + i * 2, true);
+        console.log(`Frame length: ${length}\nFrame index: ${i}\nStart ${offset}\nEnd ${offset+length}`);
         frames.push(new Uint8Array(data, offset, length));
         offset += length;
       }
-
-      //// Create audio buffer
-      //console.log(data.byteLength)
-      //const per_channel = ((data.byteLength / 4) - 2) / 2; // 8 bit -> 32 bit -> remove two -> per channel
-      //console.log("P?er channel " + per_channel)
-      //
-      //let channel_data = [
-      //  new Float32Array(per_channel), //data.splice(per_channel)),
-      //  new Float32Array(per_channel)  //data.splice(per_channel))
-      //];
-//
-      //for (let i = 0; i < per_channel; i++) {
-      //  channel_data[0][i] = data_view.getFloat32(i + 8, true) / 0xFFFF;
-      //  channel_data[1][i] = data_view.getFloat32((i + per_channel) + 8, true) / 0xFFF;
-      //}
 
       // Decode data
       if (!decoder.ready)
@@ -165,7 +150,7 @@ socket.addEventListener("message", async (event) => {
 
       // Put song playback info
       const info = get_json(data);
-      console.log(`Loading song "${info.metadata.title}".`)
+      console.log(`Loading song "${info.title}".`)
 
       player.sampleRate = info.sampleRate;
       player.sampleDuration = info.duration * info.sampleRate;
@@ -178,20 +163,20 @@ socket.addEventListener("message", async (event) => {
       player.bufferLengthSeconds = player.bufferLength / player.sampleRate;
 
       // Last fm...
-      doc.querySelector("#lastfm").setAttribute("value", `.sb ${info.metadata.artist} | ${info.metadata.title} | ${info.metadata.album}`);
+      doc.querySelector("#lastfm").setAttribute("value", `.sb ${info.artist.name} | ${info.track.name} | ${info.album.name}`);
 
       // Set metadata display
-      details_box.title.innerText = info.metadata.title;
-      details_box.artist.innerText = info.metadata.artist;
-      details_box.album.innerText = info.metadata.album;
+      details_box.title.innerText = info.track.name;
+      details_box.artist.innerText = info.artist.name;
+      details_box.album.innerText = info.album.name;
 
       // Set album cover
-      const picture_data = info.metadata.cover;
-      album_cover_img.src = picture_data;
-      background_img.src = picture_data;
+      const cover_url = `/album/${info.album.id}/img.jpg`;
+      album_cover_img.src = cover_url;
+      background_img.src = cover_url;
 
       // Set up media session
-      set_media_session(info.metadata);
+      set_media_session(info);
 
       // Set up seekbar
       seekbar.time_played.innerText = get_timestamp(player.duration_time);
@@ -382,12 +367,12 @@ function get_json(data) {
 function set_media_session(metadata) {
   if (navigator.mediaSession) {
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: metadata.title,
-      artist: metadata.artist,
-      album: metadata.album,
+      title: metadata.track.name,
+      artist: metadata.artist.name,
+      album: metadata.album.name,
       artwork: [
         {
-          src: metadata.cover,
+          src: `/album/${metadata.album.id}/img.jpg`,
           sizes: "96x96",
           type: "image/png"
         }

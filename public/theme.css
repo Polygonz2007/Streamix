@@ -24,7 +24,7 @@
 
 
     /* Fancy effects */
-    --background-image-effect: contrast(110%) brightness(100%) saturate(120%);
+    --background-image-effect: contrast(110%) brightness(75%) saturate(120%);
     --background-image-blur: max(5vw, 5vh);
 
 
@@ -34,33 +34,66 @@
 }
 
 /** Classes for colors **/
-.color-weak { color: var(--color-weak); }
-.color-light { color: var(--color-light); }
+.color-weak   { color: var(--color-weak); }
+.color-light  { color: var(--color-light); }
 .color-middle { color: var(--color-middle); }
 .color-normal { color: var(--color-normal); }
 .color-strong { color: var(--color-strong); }
 
+.font-normal    { font-weight: 400; }
+.font-medium    { font-weight: 500; }
+.font-semibold  { font-weight: 600; }
+.font-bold      { font-weight: 700; }
+
 /** Font **/
 @font-face {
-    font-family: "Consolas";
-    src: url("/asset/font/CONSOLA.TTF");
+    font-family: "Nebula Sans";
+    src: url("/asset/font/nebula-sans/NebulaSans-Book.ttf");
+    font-weight: 400;
 }
 
 @font-face {
-    font-family: "Consolas";
-    src: url("/asset/font/CONSOLAB.TTF");
-    font-weight: bold;
-}
-
-@font-face {
-    font-family: "Consolas";
-    src: url("/asset/font/CONSOLAI.TTF");
+    font-family: "Nebula Sans";
+    src: url("/asset/font/nebula-sans/NebulaSans-BookItalic.ttf");
+    font-weight: 400;
     font-style: italic;
 }
 
 @font-face {
-    font-family: "Consolas";
-    src: url("/asset/font/CONSOLAZ.TTF");
+    font-family: "Nebula Sans";
+    src: url("/asset/font/nebula-sans/NebulaSans-Medium.ttf");
+    font-weight: 500;
+}
+
+@font-face {
+    font-family: "Nebula Sans";
+    src: url("/asset/font/nebula-sans/NebulaSans-MediumItalic.ttf");
+    font-weight: 500;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: "Nebula Sans";
+    src: url("/asset/font/nebula-sans/NebulaSans-Semibold.ttf");
+    font-weight: 600;
+}
+
+@font-face {
+    font-family: "Nebula Sans";
+    src: url("/asset/font/nebula-sans/NebulaSans-SemiboldItalic.ttf");
+    font-weight: 600;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: "Nebula Sans";
+    src: url("/asset/font/nebula-sans/NebulaSans-Bold.ttf");
+    font-weight: bold;
+}
+
+@font-face {
+    font-family: "Nebula Sans";
+    src: url("/asset/font/nebula-sans/NebulaSans-BoldItalic.ttf");
     font-weight: bold;
     font-style: italic;
 }
@@ -70,5 +103,6 @@ body {
     background-color: #000;
     color: var(--color-normal);
 
-    font-family: "Consolas";
+    font-family: "Nebula Sans";
+    font-variant-numeric: tabular-nums;
 }

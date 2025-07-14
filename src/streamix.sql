@@ -21,6 +21,18 @@ CREATE TABLE tracks (
     number INT NOT NULL,
     path varchar(255) NOT NULL,
 
-    length REAL NOT NULL,
-    bitrate REAL
+    duration REAL NOT NULL,
+    bitrate REAL,
+    sample_rate INT NOT NULL
+);
+
+CREATE TABLE track_data (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    track_id INTEGER NOT NULL REFERENCES tracks(id),
+    format TINYINT NOT NULL,
+
+    block_index INT NOT NULL,
+    num_frames INT NOT NULL,
+    block_size INT NOT NULL,
+    block_data BLOB NOT NULL
 );

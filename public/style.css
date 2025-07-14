@@ -34,6 +34,7 @@ h1 {
 
 h2 {
     font-size: 1.3rem;
+    font-weight: 600;
     text-shadow: #000B 0 0 3rem;
     text-wrap: balance;
 
@@ -92,6 +93,8 @@ hr {
     border-radius: 1rem 1rem 0 0;
 
     padding-bottom: env(safe-area-inset-bottom);
+
+    font-weight: 600;
 }
 
 /* Seekbar */
