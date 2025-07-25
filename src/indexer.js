@@ -6,6 +6,7 @@ import { parseFile as parse_metadata } from 'music-metadata';
 import * as database from "./database.js";
 import codec_parser from "codec-parser";
 import { buffer } from "stream/consumers";
+import { existsSync, readFileSync } from "fs";
 
 export const Indexer = new class {
     //constructor(auto_update) {
@@ -32,7 +33,7 @@ export const Indexer = new class {
             const data = await parse_metadata(file_path);
 
             // Add artist if it does not exist yet
-            let artist = data.common.artist || "Unknown";
+            let artist = data.common.albumartist || data.common.artist || "Unknown";
             let artist_id = database.get_artist_name(artist);
 
             if (!artist_id)
@@ -44,7 +45,14 @@ export const Indexer = new class {
 
             if (!album_id) {
                 let album_image = null;
-                if (data.common.picture)
+
+                // Check folder for album cover (usually higher quality)
+                const cover_path = path.join(file.parentPath, "cover.jpg");
+                if (existsSync(cover_path))
+                    album_image = await fs.readFile(cover_path);
+
+                // Check file for album cover, if there is none in folder
+                if (!album_image && data.common.picture)
                     album_image = data.common.picture[0].data;
 
                 album_id = database.create_album(album, artist_id, album_image);
@@ -122,6 +130,13 @@ export const Indexer = new class {
         
         console.log("\nTracks indexed.");
         return true;
+    }
+
+    async get_metadata(file_path) {
+        if (existsSync(file_path))
+            return await parse_metadata(file_path);
+        else
+            return false;
     }
 }
 

@@ -14,6 +14,7 @@
 
         <!-- Page specific CSS -->
         <link rel="stylesheet" href="style.css">
+        <link rel="stylesheet" href="trackbox.css">
 
         <!-- PWA Manifest -->
         <link rel="manifest" href="manifest.json" />
@@ -23,6 +24,7 @@
 
     <body>
         <input type="text" placeholder="Last.fm command" id="lastfm">
+        <input type="button" value="Copy" id="lastfm-copy">
 
         <div id="background">
             <img id="background-image" src="">
@@ -60,9 +62,18 @@
                 <input type="button" class="image" id="next" />
             </div>
         </div>
+
+        <div id="library">
+            <input type="search" placeholder="Search here" id="search">
+            <div id="body">
+                
+            </div>
+        </div>
         
     </body>
 
     <script src="flac-decoder-min.js"></script>
-    <script src="script.js"></script>
+    <script type="module" src="comms.js"></script>
+    <script type="module" src="library.js"></script>
+    <script type="module" src="script.js"></script>
 </html>

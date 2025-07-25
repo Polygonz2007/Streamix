@@ -20,7 +20,6 @@ database.open();
 Indexer.scan(process.env.music_path);
 
 
-
 // Path
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -46,6 +45,7 @@ const session_parser = session({
 });
 
 app.use(session_parser);
+app.use(express.json());
 
 // HTTP
 import http, { Server } from "http";
@@ -63,12 +63,11 @@ import { FLACDecoder } from "@wasm-audio-decoders/flac";
 const decoder = new FLACDecoder();
 
 // Image blob reduce
-import ImageBlobReduce from "image-blob-reduce";
-const reducer = new ImageBlobReduce();
-console.log(reducer)
+import Sharp from "sharp";
 
 // WebSockets
 import WebSocket, { WebSocketServer } from 'ws';
+import { serialize } from "v8";
 global.wss = new WebSocketServer({ noServer: true });
 
 http_server.on('upgrade', upgrade_websocket);
@@ -104,42 +103,22 @@ wss.on('connection', (ws, req) => {
         // Functions
         const type = data.type;
         switch (type) {
-            case "play":
-                client.track_id = data.track_id;
-                console.log(`\nRequest for track #${client.track_id}`);
+            case "track_data_block":
+                // Validate
+                console.log("Huh")
+                console.log(data)
+                const track_id = parseInt(data.track_id) || -1;
+                //if (track_id <= 0)
+                //    return;
 
-                const metadata = database.get_track_meta(client.track_id);
-                client.block_index = -1; // So that it starts and works like it should immediatley (maybe fix layter)
+                const block_index = parseInt(data.block_index);
+                //if (block_index < 0)
+                //    return;
 
-                // Tell client about their precious song (replace with immediate first buffer)
-                return ws.send(prepare_json(1, {
-                    "sampleRate": metadata.sample_rate,
-                    "duration": metadata.duration,
-
-                    "bufferLength": 4096 * client.frame_count_per_buffer,
-
-                    "track": {
-                        "name": metadata.title,
-                        "id": metadata.track_id,
-                        "number": metadata.track_number
-                    },
-
-                    "album": {
-                        "name": metadata.album,
-                        "id": metadata.album_id
-                    },
-
-                    "artist": {
-                        "name": metadata.artist,
-                        "id": metadata.artist_id
-                    }
-                }));
-
-            case "next_buf":
-                // Update this immediatley
-                client.block_index++;
-
-                const result = database.get_track_data(client.track_id, 0, client.block_index);
+                // Get data
+                console.log(`Findig data for track #${track_id} at block index ${block_index}`)
+                const result = database.get_track_data(track_id, 0, block_index);
+                console.log(result)
 
                 // If we dont have any frames, the song is done
                 if (!result)
@@ -153,9 +132,10 @@ wss.on('connection', (ws, req) => {
                 const metadata_size = 6;
                 const buffer = Buffer.alloc(metadata_size + block_size);
 
+                // Write metadata
                 buffer.writeUInt8(0, 0); // Type
                 buffer.writeUInt8(0, 1); // Format
-                buffer.writeUInt16LE(client.block_index, 2); // Buffer index
+                buffer.writeUInt16LE(0, 2); // Buffer index
                 buffer.writeUInt16LE(num_frames, 4); // Number of frames
 
                 // Copy data into buffer (frame lengths and data)
@@ -163,7 +143,7 @@ wss.on('connection', (ws, req) => {
                 Buffer.from(block_data).copy(buffer, offset);
 
                 // Send to client
-                stats.log_event("buffer_request");
+                stats.log_event("track_data_block_get");
                 return ws.send(buffer);
         }
     });
@@ -172,7 +152,6 @@ wss.on('connection', (ws, req) => {
         // Handle connection close
     });
 });
-
 
 // move to differtent plaves idiot
 // Converts JSON into a Buffer with type, along with JSON data for client
@@ -202,14 +181,22 @@ app.get("/stats", (req, res) => {
     return res.send(stats.stats);
 });
 
+
+
+// Artists
+
+
+
 // Albums
+
 // Images
 app.get("/album/:album_id/:filename", (req, res) => {
     const album_id = req.params.album_id;
     if (!album_id)
-        return res.sendStatus(404);
+        return res.sendStatus(400);
 
     console.log("Fetching album cover for album #" + album_id + ".");
+    console.log("FIlename: " + req.params.filename)
 
     const img = database.get_album_image(album_id);
     if (!img) {
@@ -219,26 +206,126 @@ app.get("/album/:album_id/:filename", (req, res) => {
      
     // Make sure size is within reason
     if (!req.params.filename.endsWith(".jpg"))
-        return res.sendStatus(404);
+        return res.sendStatus(400);
+
+    if (req.params.filename == "max.jpg")
+        return res.contentType("image/jpeg").send(img);
 
     let size = parseInt(req.params.filename);
     if (!size)
-        return res.sendStatus(404).send(`Please provide a size for the image, e.g. like this: "/album/17/512.jpg".`);
+        return res.sendStatus(400);
 
     if (size < 32) // Too small
         size = 32;
 
-    if (size > 512) // Too big
-        size = 512;
+    if (size > 1024) // Too big
+        size = 1024;
 
     console.log(size)
 
+    //return res.contentType("image/jpeg").send(img);
+
     // Scale image to desired size and send
-    reducer.toBlob(img, { max: size }).then(blob => {
-        return res.contentType("image/jpeg").send(blob);
+    Sharp(img)
+    .resize({ width: size, kernel: "mks2021" })
+    .jpeg({ quality: 90, chromaSubsampling: '4:4:4', force: "true" }) // keep good quality and colors, while optimizing for network
+    .toBuffer()
+    .then(scaled_img => {
+        return res.contentType("image/jpeg").send(scaled_img);
     });
-    console.log("does this run...")
 });
+
+
+
+// Tracks
+app.get("/track/:track_id", (req, res) => {
+    const track_id = parseInt(req.params.track_id);
+    if (!track_id)
+        return res.sendStatus(400); // Give us an id idiot.
+
+    // Get track info
+    const metadata = database.get_track_meta(track_id);
+    if (!metadata)
+        return res.sendStatus(404); // Track does not exist
+
+    // Return the info man
+    return res.send({
+        "sample_rate": metadata.sample_rate,
+        "duration": metadata.duration,
+
+        "track": {
+            "name": metadata.track,
+            "id": metadata.track_id,
+            "number": metadata.track_number
+        },
+
+        "album": {
+            "name": metadata.album,
+            "id": metadata.album_id
+        },
+
+        "artist": {
+            "name": metadata.artist,
+            "id": metadata.artist_id
+        }
+    });
+});
+
+
+// Search
+const search_index = database.get_all_track_meta();
+app.post("/search", (req, res) => {
+    // type: all, tracks, albums, artists (if none is present all is assumed)
+    // string: what to search for
+    // num_results: how many results to return
+    // page: 0 by default, if incremented shows more results (may be less related)
+
+    // Maybe replace with SQLite FTS5, but for now simple search
+    // Foe now only tracks!
+
+    const data = req.body;
+    let string = data.string;
+    if (!string)
+        string = "";
+
+    // Clean it
+    string = string.toLowerCase();
+
+    let results = [];
+    for (let i = 0; i < search_index.length; i++) {
+        if (results.length > 30)
+            break;
+
+        const c = search_index[i];
+
+        if (c.track.toLowerCase().indexOf(string) != -1) {
+            results.push({ "type": "track", "id": c.track_id });
+            continue;
+        }
+
+        if (c.artist.toLowerCase().indexOf(string) != -1) {
+            results.push({ "type": "track", "id": c.track_id });
+            continue;
+        }
+
+        if (c.album.toLowerCase().indexOf(string) != -1) {
+            results.push({ "type": "track", "id": c.track_id });
+            continue;
+        }
+    }
+
+    return res.send(results);
+
+    // Response strcurure:
+    // [
+    //    { type: track, id: __ },
+    //    { type: album, id: __ },
+    //    ...
+    // ]
+});
+
+
+
 
 
 

@@ -148,6 +148,60 @@ input.image:active {
 #previous { background-image: url("/asset/controls/Previous.svg"); }
 #next { background-image: url("/asset/controls/Next.svg"); }
 
+
+
+
+/* Library */
+#library {
+    position: fixed;
+    left: 0; top: 50%;
+    transform: translate(-22rem, -50%);
+
+    width: 24rem;
+    height: calc(5rem + round(up, 60vh, 6.5rem + 2px) - 2px);
+    overflow: hidden;
+
+    background-color: var(--color-background-glass);
+
+    border: var(--border-default);
+    border-left: none;
+    border-radius: 0 1rem 1rem 0;
+
+    font-weight: 600;
+
+    transition: transform 0.5s;
+}
+
+#library:hover {
+    transform: translate(0, -50%);
+}
+
+#library > #search {
+    height: 3rem;
+    width: calc(100% - 1rem);
+    margin: 0.5rem;
+}
+
+#library > #body {
+    height: calc(100% - 4rem);
+    overflow-y: scroll;
+    overflow-x: hidden;
+
+    scrollbar-width: thin;
+    scrollbar-color: #FFF2 #0000;
+    scroll-snap-type: y mandatory;
+
+    transition: scrollbar-color 100ms;
+}
+
+#library > #body:hover {
+    scrollbar-color: #FFF4 #0000;
+}
+
+
+
+
+
 /* Phone Only */
 @media only screen and (max-width: 500px) {
     #info {

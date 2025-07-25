@@ -1,6 +1,10 @@
 
 const doc = document;
 
+///  IMPORTS  ///
+import Comms from "./comms.js";
+import Library from "./library.js";
+
 ///  ELEMENTS  ///
 // Controls
 const controls = doc.querySelector("#controls");
@@ -27,6 +31,11 @@ details_box.album = doc.querySelector("#album > .text");
 
 details_box.album_full = doc.querySelector("#album");
 
+// Library
+let library = {
+  searchbar: doc.querySelector("#library > #search"),
+  results: doc.querySelector("#library > #results")
+}
 
 ///  DECODER ///
 let decoder;
@@ -42,33 +51,41 @@ const AudioContext = window.AudioContext // Default
 let audioCtx;
 
 if (AudioContext)
-  audioCtx = new AudioContext();
+  audioCtx = new AudioContext({ "latencyHint": "playback" });
 else
   alert("Your browser does not support AudioContext. Please upgrade your browser to use this service.");
 
 const player = {
+  // General
   volume: 1,
   speed: 1,
-  song_id: 0,
 
-  start_time: 0,
-  duration_time: 0,
+  // Track playback
+  track_id: 0,
+  block_index: 0,
+  sample_rate: 0,
+  track_duration: 0,
+
+  started_time: 0,
+  played_time: 0,
+  time: 0,
+
+  // Audio handling
+  buffers: [],
+  active_buffer: 0, // which one is playing RN
   headroom: 0 // the amount of buffers after this one
 }
 
 // Replace with something that makes more sense and stuff, actually just replace everything here
 next_btn.addEventListener("click", () => {
-  player.song_id++;
-  ws_request("play", {"track_id": player.song_id});
+  player.track_id++;
+  start_track(player.track_id);
 });
 
 prev_btn.addEventListener("click", () => {
-  player.song_id--;
-  ws_request("play", {"track_id": player.song_id});
+  player.track_id--;
+  start_track(player.track_id);
 });
-
-let audio_buffer = [];
-let active_buffer = -1;
 
 
 // Websocket
@@ -88,6 +105,7 @@ socket.addEventListener("message", async (event) => {
 
   switch (type) {
     case 0:
+      console.log("yo")
       // Get format of data, to decide how to decode
       const format = data_view.getUint8(1);
       if (format !== 0) // if format is not flac
@@ -95,8 +113,9 @@ socket.addEventListener("message", async (event) => {
 
       // Get buffer index, check order
       const buffer_index = data_view.getUint16(2, true);
-      if (buffer_index != active_buffer + 1)
-        return;
+      console.log(buffer_index)
+      //if (buffer_index != player.block_index)
+      //  return;
 
       // Split data into frames
       let frames = [];
@@ -118,22 +137,25 @@ socket.addEventListener("message", async (event) => {
       const decoded = await decoder.decodeFrames(frames);
 
       // Shift buffer and put in data
-      active_buffer = buffer_index;// = 1 - active_buffer;
+      //active_buffer = buffer_index; // = 1 - active_buffer;
       
-      audio_buffer[active_buffer] = prepare_source(decoded.channelData, decoded.samplesDecoded, player.sampleRate * player.speed);
-      audio_buffer[active_buffer].source.start(player.start_time + player.duration_time);//(buffer_index * player.bufferLengthSeconds / player.speed));
-      if (buffer_index == 0) {
-        player.start_time = audioCtx.currentTime;
-        resume();
-        ws_request("next_buf");
-      }
+      console.log(decoded.samplesDecoded)
+      const source = prepare_source(decoded.channelData, decoded.samplesDecoded, player.sample_rate * player.speed);
+      source.source.start(player.time);//(buffer_index * player.bufferLengthSeconds / player.speed));
+      player.time += source.source.buffer.duration;
+      player.block_index++;
+      ws_request("track_data_block", { block_index: player.block_index, track_id: player.track_id });
+      //if (buffer_index == 0) {
+      //  player.start_time = audioCtx.currentTime;
+      //  resume();
+      //  //ws_request("next_buf");
+      //}
 
-      player.duration_time += audio_buffer[active_buffer].buffer.duration;
+      //player.duration_time += audio_buffer[active_buffer].buffer.duration;
 
-      audio_buffer[active_buffer].source.addEventListener('ended', () => {
-        ws_request("next_buf");
-        update_seekbar()
-      });
+      //audio_buffer[active_buffer].source.addEventListener('ended', () => {
+      //  ws_request("next_buf");
+      //});
 
       return;
 
@@ -169,8 +191,11 @@ socket.addEventListener("message", async (event) => {
       details_box.artist.innerText = info.artist.name;
       details_box.album.innerText = info.album.name;
 
+      // Get size of thang
+      const size = parseInt((album_cover_img.getBoundingClientRect().width - 6) * window.devicePixelRatio);
+
       // Set album cover
-      const cover_url = `/album/${info.album.id}/512`;
+      const cover_url = `/album/${info.album.id}/${size}.jpg`;
       album_cover_img.src = cover_url;
       background_img.src = cover_url;
 
@@ -196,13 +221,13 @@ socket.addEventListener("message", async (event) => {
 
     case 2:
       // Remove metadata display
-      details_box.title.innerText = "...";
-      details_box.artist.innerText = "...";
-      details_box.album.innerText = "...";
-
-      // Remove album cover
-      album_cover_img.src = "/asset/logo/512/Winter.png";
-      background_img.src = "";
+      //details_box.title.innerText = "Not Playing";
+      //details_box.artist.innerText = "...";
+      //details_box.album.innerText = "...";
+//
+      //// Remove album cover
+      //album_cover_img.src = "/asset/logo/512/Deep.png";
+      //background_img.src = "/asset/logo/512/Deep.png";;
 
       return;
   }
@@ -218,32 +243,69 @@ socket.addEventListener("message", async (event) => {
   await decoder.ready;
 
   console.log("Decoder ready!")
+})();
 
-  async function decode_frame(frame) {
-    const length = frame.header.blockSize;
-    let frame_data = new Uint8Array(length);
-    for (let i = 0; i < length; i++) {
-      frame_data[i] = frame.data[i];
-    }
+async function start_track(id) {
+  // Get track info
+  const meta = await Comms.get_json(`/track/${id}`);
+  if (!meta) {
+    details_box.title.innerText = "Track not found";
+    details_box.artist.innerText = "---";
+    details_box.album.innerText = "---";
 
-    console.log(frame_data)
-    const decoded = await decoder.decodeFrames(frame);
+    album_cover_img.src = "";
+    background_img.src = "";
 
-    console.log(decoded.channelData, decoded.samplesDecoded, decoded.errors);
-
-    prepare_source(decoded.channelData, decoded.samplesDecoded, decoded.samplerate);
+    return;
   }
 
-  // start the source playing
-  //play_btn.addEventListener("click", () => {
-  //  const current = audio_buffer[0];
-  //  const source = prepare_source(current.data, current.samples, current.rate);
-//
-  //  source.start();
-  //})
-})()
+  // Inform the player of this stunning revelation
+  player.track_id = id;
+  player.block_index = 0;
+  player.sample_rate = meta.sample_rate;
+  player.duration = meta.duration;
 
+  // Display info to the user
+  details_box.title.innerText = meta.track.name;
+  details_box.artist.innerText = meta.artist.name;
+  details_box.album.innerText = meta.album.name;
 
+  // Get size of thang
+  const size = parseInt((album_cover_img.getBoundingClientRect().width - 6) * window.devicePixelRatio);
+
+  // Set album cover
+  const cover_url = `/album/${meta.album.id}/${size}.jpg`;
+  album_cover_img.src = cover_url;
+  background_img.src = cover_url;
+
+  // Get first data
+  ws_request("track_data_block", { block_index: player.block_index, track_id: player.track_id });
+}
+
+window.start_track = start_track;
+
+async function search(string) {
+  const tracks = await Comms.post_json("/search", { "string": string });
+  let result = [];
+
+  Library.clear();
+
+  for (let i = 0; i < tracks.length; i++) {
+    const track = await Comms.get_json(`/track/${tracks[i].id}`);
+    result.push(track);
+
+    Library.add_track(track);
+  }
+
+  return result;
+}
+
+library.searchbar.addEventListener("keyup", () => {
+  search(library.searchbar.value);
+});
+
+window.search = search;
+search(library.searchbar.value);
 
 // Audio Context
 //const audioCtx = new AudioContext();
@@ -264,6 +326,7 @@ function prepare_source(data, length, samplerate) {
   source.buffer = buffer;
   source.connect(audioCtx.destination);
 
+  console.log("source prepared")
   return {buffer: buffer, source: source};
 }
 
@@ -433,3 +496,15 @@ function update_media_session_position() {
 //document.addEventListener('touchstart', fixAudioContext);
 //// iOS 9
 //document.addEventListener('touchend', fixAudioContext);
+
+doc.getElementById("lastfm-copy").addEventListener("click", () => {
+   // Get the text field
+  const copyText = document.getElementById("lastfm");
+
+  // Select the text field
+  copyText.select();
+  copyText.setSelectionRange(0, 99999); // For mobile devices
+
+   // Copy the text inside the text field
+  document.execCommand('copy');
+});

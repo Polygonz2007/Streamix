@@ -1,0 +1,49 @@
+
+.trackbox {
+    display: flex;
+
+    border: solid #AAA2 2px;
+    border-radius: 0.5rem;
+
+    background-color: #0000;
+    overflow: hidden;
+    scroll-snap-align: start;
+
+    height: 6rem;
+    margin: 0.5em;
+
+    transition: background-color 100ms;
+
+    background-size: cover;
+    background-position: center;
+}
+
+.trackbox:hover {
+    background-color: #8882;
+}
+
+.trackbox > div {
+    margin-left: 0.5rem;
+    text-wrap: nowrap;
+}
+
+.trackbox > img {
+    width: 96px;
+    height: 96px;
+}
+
+.title {
+    font-weight: 600;
+    margin: 0.4rem 0;
+    margin-top: 0.7rem;
+}
+
+.artist {
+    font-weight: 400;
+    margin: 0.4rem 0;
+}
+
+.album {
+    font-weight: 400;
+    margin: 0.4rem 0;
+}

@@ -129,7 +129,7 @@ export function create_track(name, number, album_id, path, metadata) {
 
 export function get_track_meta(id) {
     const query = db.prepare(`SELECT 
-                    tracks.id as track_id, tracks.name as title, tracks.number as track_number,
+                    tracks.id as track_id, tracks.name as track, tracks.number as track_number,
                     tracks.duration, tracks.bitrate, tracks.sample_rate,
                     albums.id as album_id, albums.name as album,
                     artists.id as artist_id, artists.name as artist
@@ -138,6 +138,22 @@ export function get_track_meta(id) {
                 INNER JOIN artists ON albums.artist_id = artists.id
                 WHERE tracks.id = ?`);
     const result = query.get(id);
+    if (!result)
+        return false;
+
+    return result;
+}
+
+export function get_all_track_meta() {
+    const query = db.prepare(`SELECT 
+                    tracks.id as track_id, tracks.name as track, tracks.number as track_number,
+                    tracks.duration, tracks.bitrate, tracks.sample_rate,
+                    albums.id as album_id, albums.name as album,
+                    artists.id as artist_id, artists.name as artist
+                FROM tracks
+                INNER JOIN albums ON tracks.album_id = albums.id
+                INNER JOIN artists ON albums.artist_id = artists.id`);
+    const result = query.all();
     if (!result)
         return false;
 
