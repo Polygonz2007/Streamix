@@ -23,13 +23,15 @@ CREATE TABLE tracks (
 
     duration REAL NOT NULL,
     bitrate REAL,
-    sample_rate INT NOT NULL
+    sample_rate INT NOT NULL,
+    num_blocks INT NOT NULL
 );
 
 CREATE TABLE track_data (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     track_id INTEGER NOT NULL REFERENCES tracks(id),
     format TINYINT NOT NULL,
+    duration REAL NOT NULL,
 
     block_index INT NOT NULL,
     num_frames INT NOT NULL,

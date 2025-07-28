@@ -119,8 +119,8 @@ export function get_album_image(id) {
 
 // Tracks
 export function create_track(name, number, album_id, path, metadata) {
-    const query = db.prepare("INSERT INTO tracks (name, number, album_id, path, duration, bitrate, sample_rate) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    const result = query.run(name, number, album_id, path, metadata.duration, metadata.bitrate, metadata.sample_rate);
+    const query = db.prepare("INSERT INTO tracks (name, number, album_id, path, duration, bitrate, sample_rate, num_blocks) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    const result = query.run(name, number, album_id, path, metadata.duration, metadata.bitrate, metadata.sample_rate, metadata.num_blocks);
     if (result.changes == 0)
         return false;
 
@@ -128,18 +128,34 @@ export function create_track(name, number, album_id, path, metadata) {
 }
 
 export function get_track_meta(id) {
+    // Get normal metadata
     const query = db.prepare(`SELECT 
                     tracks.id as track_id, tracks.name as track, tracks.number as track_number,
-                    tracks.duration, tracks.bitrate, tracks.sample_rate,
+                    tracks.duration, tracks.bitrate, tracks.sample_rate, tracks.num_blocks,
                     albums.id as album_id, albums.name as album,
                     artists.id as artist_id, artists.name as artist
                 FROM tracks
                 INNER JOIN albums ON tracks.album_id = albums.id
                 INNER JOIN artists ON albums.artist_id = artists.id
                 WHERE tracks.id = ?`);
-    const result = query.get(id);
+    let result = query.get(id);
     if (!result)
         return false;
+
+    // Construct block data
+    const block_query = db.prepare(`SELECT duration FROM track_data WHERE track_data.track_id = ? ORDER BY track_data.block_index ASC`);
+    const block_result = block_query.all(id);
+    if (!block_result)
+        console.log("shi idk");
+
+    const num_blocks = block_result.length;
+    const blocks = new Float32Array(num_blocks);
+    for (let i = 0; i < num_blocks; i++) {
+        blocks[i] = block_result[i].duration;
+    }
+
+    // Add to metadata
+    result.block_durations = blocks;
 
     return result;
 }
@@ -147,7 +163,7 @@ export function get_track_meta(id) {
 export function get_all_track_meta() {
     const query = db.prepare(`SELECT 
                     tracks.id as track_id, tracks.name as track, tracks.number as track_number,
-                    tracks.duration, tracks.bitrate, tracks.sample_rate,
+                    tracks.duration, tracks.bitrate, tracks.sample_rate, tracks.num_blocks,
                     albums.id as album_id, albums.name as album,
                     artists.id as artist_id, artists.name as artist
                 FROM tracks
@@ -179,9 +195,9 @@ export function get_track_by_path(path) {
 }
 
 // Track data
-export function create_track_data(track_id, format, index, num_frames, block_size, data) {
-    const query = db.prepare("INSERT INTO track_data (track_id, format, block_index, num_frames, block_size, block_data) VALUES (?, ?, ?, ?, ?, ?)");
-    const result = query.run(track_id, format, index, num_frames, block_size, data);
+export function create_track_data(track_id, format, index, duration, num_frames, block_size, data) {
+    const query = db.prepare("INSERT INTO track_data (track_id, format, block_index, duration, num_frames, block_size, block_data) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    const result = query.run(track_id, format, index, duration, num_frames, block_size, data);
     if (result.changes == 0)
         return false;
 

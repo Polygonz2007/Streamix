@@ -10,7 +10,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // Imports
-import fs, { glob } from "fs";
+import fs from "fs";
 import * as stats from "./src/stats.js";
 import * as database from "./src/database.js";
 import { Indexer } from "./src/indexer.js";
@@ -98,54 +98,55 @@ wss.on('connection', (ws, req) => {
         data = isBinary ? data : data.toString();
         data = JSON.parse(data);
 
+        // Get important stuff
         const client = req.session;
+        const req_id = data.req_id;
 
-        // Functions
-        const type = data.type;
-        switch (type) {
-            case "track_data_block":
-                // Validate
-                console.log("Huh")
-                console.log(data)
-                const track_id = parseInt(data.track_id) || -1;
-                //if (track_id <= 0)
-                //    return;
+        // Validate
+        const track_id = parseInt(data.track_id) || -1;
+        //if (track_id <= 0)
+        //    return;
 
-                const block_index = parseInt(data.block_index);
-                //if (block_index < 0)
-                //    return;
+        const block_index = parseInt(data.block_index);
+        //if (block_index < 0)
+        //    return;
 
-                // Get data
-                console.log(`Findig data for track #${track_id} at block index ${block_index}`)
-                const result = database.get_track_data(track_id, 0, block_index);
-                console.log(result)
+        // Get format
+        let format = data.format || 1;
 
-                // If we dont have any frames, the song is done
-                if (!result)
-                    return ws.send(prepare_json(2)); // Signal that the song is done
+        // Get data
+        console.log(`Request for data Track #${track_id} Block #${block_index}`)
+        const result = database.get_track_data(track_id, 0, block_index);
 
-                const num_frames = result.num_frames;
-                const block_size = result.block_size;
-                const block_data = result.block_data;
-
-                // Create buffer with message type and buffer index and frame data
-                const metadata_size = 6;
-                const buffer = Buffer.alloc(metadata_size + block_size);
-
-                // Write metadata
-                buffer.writeUInt8(0, 0); // Type
-                buffer.writeUInt8(0, 1); // Format
-                buffer.writeUInt16LE(0, 2); // Buffer index
-                buffer.writeUInt16LE(num_frames, 4); // Number of frames
-
-                // Copy data into buffer (frame lengths and data)
-                let offset = metadata_size;
-                Buffer.from(block_data).copy(buffer, offset);
-
-                // Send to client
-                stats.log_event("track_data_block_get");
-                return ws.send(buffer);
+        // If we dont have any frames, the song is done
+        if (!result) {
+            format = 0; // Answer with format 0. Don't get or send any data
         }
+            
+
+        const num_frames = result.num_frames || 0;
+        const block_size = result.block_size || 0;
+        const block_data = result.block_data;
+
+        // Create buffer with message type and buffer index and frame data
+        const metadata_size = 4;
+        const buffer = Buffer.alloc(metadata_size + block_size);
+
+        // Write metadata - IIFN
+        buffer.writeUInt16LE(req_id, 0);  // Request ID
+        buffer.writeUInt8(format, 2);     // Format (1: MAX Flac)
+        buffer.writeUInt8(num_frames, 3); // Number of frames (max 255)
+
+        // Copy data into buffer (frame lengths and data)
+        if (format != 0) {
+            let offset = metadata_size;
+            Buffer.from(block_data).copy(buffer, offset);
+        }
+        
+        // Send to client
+        stats.log_event("buffer_get");
+        console.log("Sent.")
+        return ws.send(buffer);
     });
 
     ws.on('close', () => {
@@ -252,6 +253,8 @@ app.get("/track/:track_id", (req, res) => {
     return res.send({
         "sample_rate": metadata.sample_rate,
         "duration": metadata.duration,
+        "num_blocks": metadata.num_blocks,
+        "block_durations": metadata.block_durations,
 
         "track": {
             "name": metadata.track,
@@ -323,10 +326,6 @@ app.post("/search", (req, res) => {
     //    ...
     // ]
 });
-
-
-
-
 
 
 // Start server

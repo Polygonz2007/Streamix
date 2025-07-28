@@ -1,12 +1,11 @@
 // Find all music and puts it in the database. Also updates database when files change.
 
 import * as fs from "fs/promises";
+import { existsSync } from "fs";
 import path from "path";
 import { parseFile as parse_metadata } from 'music-metadata';
 import * as database from "./database.js";
-import codec_parser from "codec-parser";
-import { buffer } from "stream/consumers";
-import { existsSync, readFileSync } from "fs";
+import codec_parser, { duration } from "codec-parser";
 
 export const Indexer = new class {
     //constructor(auto_update) {
@@ -15,7 +14,19 @@ export const Indexer = new class {
 
     async scan(directory) {
         console.log("Indexing tracks...");
-        const block_size = process.env.block_size;
+
+        // Check if directory exists
+        if (!existsSync(directory)) {
+            console.log("Indexing failed. Directory is not available.");
+            return false;
+        }
+
+        // Block size. Make sure it is within range
+        let block_size = parseInt(process.env.block_size) || 64;
+        if (block_size < 1)
+            block_size = 1;
+        if (block_size > 255)
+            block_size = 255;
 
         // Find all .flac files here, and print out metadata.
         const files = (await fs.readdir(directory, { withFileTypes: true, recursive: true }))
@@ -29,8 +40,14 @@ export const Indexer = new class {
             if (database.get_track_by_path(file_path))
                 continue;
 
-            // Get and parse data
+            // Get and parse metadata
             const data = await parse_metadata(file_path);
+
+            // Get and parse audio data
+            const parser = new codec_parser("audio/flac");
+            const file_data = await fs.readFile(file_path);
+            const frames = parser.parseAll(file_data);
+            const num_blocks = Math.ceil(frames.length / block_size);
 
             // Add artist if it does not exist yet
             let artist = data.common.albumartist || data.common.artist || "Unknown";
@@ -69,14 +86,11 @@ export const Indexer = new class {
             const track_id = database.create_track(track, number, album_id, file_path, {
                 duration: data.format.duration,
                 bitrate: data.format.bitrate,
-                sample_rate: data.format.sampleRate
+                sample_rate: data.format.sampleRate,
+                num_blocks: num_blocks
             });
 
             // Then add track data.
-            const parser = new codec_parser("audio/flac");
-            const file_data = await fs.readFile(file_path);
-            const frames = parser.parseAll(file_data);
-            const num_blocks = Math.ceil(frames.length / process.env.block_size);
             let tot_size = 0;
             let tot_blocks = 0;
 
@@ -85,6 +99,7 @@ export const Indexer = new class {
                 // Gather frames into block
                 let block_frames = [];
                 let block_frames_size = 0;
+                let block_duration = 0;
 
                 // Get all the data
                 let num_frames = 0;
@@ -98,6 +113,7 @@ export const Indexer = new class {
                     block_frames.push(frame_data);
                     block_frames_size += frame_data.length;
                     num_frames++;
+                    block_duration += frames[frame_index].duration;
                 }
 
                 // Create buffer, write frame lengths
@@ -116,8 +132,11 @@ export const Indexer = new class {
                     offset += block_frames[i].length;
                 }
 
+                // Covert duration from ms to s.
+                block_duration /= 1000;
+
                 // Add to database
-                const result = database.create_track_data(track_id, format, index, num_frames, buffer_size, block_data);
+                const result = database.create_track_data(track_id, format, index, block_duration, num_frames, buffer_size, block_data);
                 if (!result)
                     console.warn(`Error indexing block data for track "${track}" [ID ${track_id}] at index #${index}.`);
 

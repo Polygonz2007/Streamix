@@ -286,18 +286,20 @@ window.start_track = start_track;
 
 async function search(string) {
   const tracks = await Comms.post_json("/search", { "string": string });
-  let result = [];
+  let tracks_data = [];
 
   Library.clear();
+  Library.loading = true; //display loading thing
 
   for (let i = 0; i < tracks.length; i++) {
     const track = await Comms.get_json(`/track/${tracks[i].id}`);
-    result.push(track);
-
-    Library.add_track(track);
+    tracks_data.push(track);
   }
 
-  return result;
+  Library.show_tracks(tracks_data);
+  Library.loading = false;
+
+  return tracks_data;
 }
 
 library.searchbar.addEventListener("keyup", () => {
