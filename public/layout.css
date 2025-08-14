@@ -1,6 +1,6 @@
 :root {
-    --album-cover-size-max: min(32rem);
-    --album-cover-size: min(min(80vw, 65vh), var(--album-cover-size-max));
+    --album-cover-size-max: 32rem;
+    --album-cover-size: min(min(75vw, 52vh), var(--album-cover-size-max));
 
     --controls-width: 48rem;
 }

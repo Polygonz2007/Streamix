@@ -4,10 +4,9 @@
         <meta charset="UTF-8"> <!-- Text -->
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0; viewport-fit=cover"/> <!-- Prevent zooming -->
 
-        <!-- Title and icon -->
+        <!-- Title -->
         <title>Streamix</title>
-        <link rel="icon" type="image/x-icon" href="/asset/logo/192/Winter Round.png">
-
+        
         <!-- Global CSS -->
         <link rel="stylesheet" href="theme.css">
         <link rel="stylesheet" href="layout.css">
@@ -19,7 +18,9 @@
         <!-- PWA Manifest -->
         <link rel="manifest" href="manifest.json" />
 
-        <!-- Theme javascript -->
+        <!-- Preload important stuff -->
+        <link rel="preload" href="asset/logo/512/Summer.png">
+        <link rel="preload" href="asset/icons/Loading.gif">
     </head>
 
     <body>
@@ -28,20 +29,20 @@
 
         <p id="debug-info">Blocks</p>
 
-        <div id="background">
-            <img id="background-image" src="">
-            <div id="background-blur"></div>
-        </div>
+        <canvas id="background"></canvas>
 
         <div id="info">
-            <img id="album-cover" src="asset//logo/512/Winter.png">
+            <div id="album-cover-container">
+                <img id="album-cover" src="asset/logo/512/Summer.png">
+                <img id="loading" src="asset/icons/Loading.gif">
+            </div>
             <h1 id="title" class="text">...</h1>
 
             <hr>
 
             <h2 id="artist"> <!-- Artist -->
-                <span class="color-middle font-medium">by </span>
-                <span class="text">...</span>
+                <span>by </span>
+                <a>...</a>
             </h2>
 
             <h2 id="album"> <!-- Album -->
@@ -54,14 +55,19 @@
         <div id="controls" class="paused">
             <div id="seekbar-container">
                 <span id="time-played">0:00</span>
-                <input id="seekbar" type="range" step="any" />
+                <div id="seekbar">
+                    <div id="line"></div>
+                    <div id="dot"></div>
+                </div>
                 <span id="time-remaining">-0:00</span>
             </div>
 
             <div id="control-buttons">
+                <!--<input type="button" class="image" id="settings" />-->
                 <input type="button" class="image" id="previous" />
                 <input type="button" class="image" id="pause" />
                 <input type="button" class="image" id="next" />
+                <!--<input type="button" class="image" id="volume" />-->
             </div>
         </div>
 
@@ -72,10 +78,10 @@
             </div>
         </div>
         
+        <!-- Scripts -->
+        <script src="flac-decoder-min.js"></script>
+        <script type="module" src="comms.js"></script>
+        <script type="module" src="library.js"></script>
+        <script type="module" src="stream.js"></script>
     </body>
-
-    <script src="flac-decoder-min.js"></script>
-    <script type="module" src="comms.js"></script>
-    <script type="module" src="library.js"></script>
-    <script type="module" src="stream.js"></script>
 </html>

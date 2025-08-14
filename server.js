@@ -17,7 +17,15 @@ import { Indexer } from "./src/indexer.js";
 
 database.open();
 
-Indexer.scan(process.env.music_path);
+// Find and scan directories
+(async () => {
+    const music_path = process.env.music_path;
+    let music_dirs = music_path.split(";");
+    for (let i = 0; i < music_dirs.length; i++) {
+        music_dirs[i] = music_dirs[i].trim();
+        await Indexer.scan(music_dirs[i]);
+    }
+})();
 
 
 // Path
@@ -67,7 +75,6 @@ import Sharp from "sharp";
 
 // WebSockets
 import WebSocket, { WebSocketServer } from 'ws';
-import { serialize } from "v8";
 global.wss = new WebSocketServer({ noServer: true });
 
 http_server.on('upgrade', upgrade_websocket);
@@ -94,6 +101,8 @@ function upgrade_websocket(request, socket, head) {
 wss.on('connection', (ws, req) => {
 
     ws.on('message', async (data, isBinary) => {
+        const start_time = performance.now();
+
         // Translate
         data = isBinary ? data : data.toString();
         data = JSON.parse(data);
@@ -115,7 +124,6 @@ wss.on('connection', (ws, req) => {
         let format = data.format || 1;
 
         // Get data
-        console.log(`Request for data Track #${track_id} Block #${block_index}`)
         const result = database.get_track_data(track_id, 0, block_index);
 
         // If we dont have any frames, the song is done
@@ -145,7 +153,9 @@ wss.on('connection', (ws, req) => {
         
         // Send to client
         stats.log_event("buffer_get");
-        console.log("Sent.")
+        const end_time = performance.now();
+        console.log(`=> Block #${block_index} [Track ${track_id}] took ${Math.ceil(end_time - start_time)}ms to process.`);
+
         return ws.send(buffer);
     });
 
@@ -183,6 +193,11 @@ app.get("/stats", (req, res) => {
 });
 
 
+// App Icon
+app.get("/favicon.ico", (req, res) => {
+    return res.sendFile(path.join(public_path, "asset/logo/192/Summer Round.png"));
+});
+
 
 // Artists
 
@@ -195,9 +210,6 @@ app.get("/album/:album_id/:filename", (req, res) => {
     const album_id = req.params.album_id;
     if (!album_id)
         return res.sendStatus(400);
-
-    console.log("Fetching album cover for album #" + album_id + ".");
-    console.log("FIlename: " + req.params.filename)
 
     const img = database.get_album_image(album_id);
     if (!img) {
@@ -219,10 +231,8 @@ app.get("/album/:album_id/:filename", (req, res) => {
     if (size < 32) // Too small
         size = 32;
 
-    if (size > 1024) // Too big
-        size = 1024;
-
-    console.log(size)
+    if (size > 2048) // Too big
+        size = 2048;
 
     //return res.contentType("image/jpeg").send(img);
 
@@ -240,22 +250,31 @@ app.get("/album/:album_id/:filename", (req, res) => {
 
 // Tracks
 app.get("/track/:track_id", (req, res) => {
+    // Get ID
     const track_id = parseInt(req.params.track_id);
     if (!track_id)
         return res.sendStatus(400); // Give us an id idiot.
 
-    // Get track info
-    const metadata = database.get_track_meta(track_id);
-    if (!metadata)
-        return res.sendStatus(404); // Track does not exist
+    // Create correct thing
+    if (req.params.track_id.endsWith(".format")) {
+        // FORMAT
+        const format_data = database.get_track_format(track_id);
+        if (!format_data)
+            return res.sendStatus(404); // Track does not exist
 
-    // Return the info man
-    return res.send({
-        "sample_rate": metadata.sample_rate,
-        "duration": metadata.duration,
-        "num_blocks": metadata.num_blocks,
-        "block_durations": metadata.block_durations,
+        return res.send(create_format_buffer(format_data));
+    } else {
+        // META
+        const metadata = database.get_track_meta(track_id);
+        if (!metadata)
+            return res.sendStatus(404); // Track does not exist
 
+        return res.send(create_metadata_json(metadata));
+    } 
+});
+
+function create_metadata_json(metadata) {
+    let data = {
         "track": {
             "name": metadata.track,
             "id": metadata.track_id,
@@ -264,19 +283,72 @@ app.get("/track/:track_id", (req, res) => {
 
         "album": {
             "name": metadata.album,
-            "id": metadata.album_id
+            "id": metadata.album_id,
+            "cover": metadata.album_cover == 0 ? true : false
         },
 
-        "artist": {
-            "name": metadata.artist,
-            "id": metadata.artist_id
+        "artists": [],
+        "album_artist": {
+            "name": metadata.album_artist,
+            "id": metadata.album_artist_id
         }
-    });
-});
+    };
+
+    for (let i = 0; i < metadata.artists.length; i++) {
+        data.artists.push({
+            "name": metadata.artists[i].artist,
+            "id": metadata.artists[i].artist_id
+        });
+    }
+
+    return data;
+}
+
+function create_format_buffer(metadata) {
+    const num_blocks = metadata.num_blocks;
+    const buffer_size = 4 + 4 + 2 + (4 * num_blocks);
+    const buffer = new ArrayBuffer(buffer_size);
+    const buffer_view = new DataView(buffer);
+    console.log(`Buffer is ${buffer_size} bytes containing ${num_blocks} blocks.`);
+
+    buffer_view.setUint32(0, metadata.sample_rate, true); // SAMPLE RATE
+    buffer_view.setFloat32(4, metadata.duration, true); // DURATION
+    buffer_view.setUint16(8, metadata.num_blocks, true); // NUM_BLOCKS
+
+    let offset = 10;
+    for (let i = 0; i < num_blocks; i++) {
+        buffer_view.setFloat32(offset, metadata.block_durations[i], true); // BLOCK DURATIONS
+        offset += 4;
+    }
+
+    return Buffer.from(buffer);
+}
 
 
 // Search
-const search_index = database.get_all_track_meta();
+//let search_index;
+//
+//function update_search_index() {
+//    const all_meta = database.get_all_track_meta();
+//    search_index = [];
+//
+//    for (let i = 0; i < all_meta.length; i++) {
+//        const meta = all_meta[i];
+//        let keywords = "";
+//
+//        keywords += `${meta.track} ${meta.track_number} ${meta.album}`;
+//        for (let i = 0; i < meta.artists.length; i++) {
+//            keywords += ` ${meta.artists[i].artist}`;
+//        }
+//
+//        search_index.push({
+//            keywords: keywords,
+//            meta: meta,
+//            track_id: meta.track.id
+//        });
+//    }
+//}
+
 app.post("/search", (req, res) => {
     // type: all, tracks, albums, artists (if none is present all is assumed)
     // string: what to search for
@@ -286,6 +358,9 @@ app.post("/search", (req, res) => {
     // Maybe replace with SQLite FTS5, but for now simple search
     // Foe now only tracks!
 
+    // Updates
+    const start_time = performance.now();
+
     const data = req.body;
     let string = data.string;
     if (!string)
@@ -293,29 +368,34 @@ app.post("/search", (req, res) => {
 
     // Clean it
     string = string.toLowerCase();
+    string.replace("%", "");
+    string.replace("_", "");
+
+    //let results = [];
+    //for (let i = 0; i < search_index.length; i++) {
+    //    if (results.length > 30)
+    //        break;
+//
+    //    const c = search_index[i];
+//
+    //    if (c.keywords.toLowerCase().indexOf(string) != -1) {
+    //        results.push({ "type": "track", "id": c.track_id, "index": i });
+    //        continue;
+    //    }
+    //}
+
+    // compile for now
+    const tracks = database.search(string, 32);
+    if (!tracks)
+        return res.send([]);
 
     let results = [];
-    for (let i = 0; i < search_index.length; i++) {
-        if (results.length > 30)
-            break;
-
-        const c = search_index[i];
-
-        if (c.track.toLowerCase().indexOf(string) != -1) {
-            results.push({ "type": "track", "id": c.track_id });
-            continue;
-        }
-
-        if (c.artist.toLowerCase().indexOf(string) != -1) {
-            results.push({ "type": "track", "id": c.track_id });
-            continue;
-        }
-
-        if (c.album.toLowerCase().indexOf(string) != -1) {
-            results.push({ "type": "track", "id": c.track_id });
-            continue;
-        }
+    for (let i = 0; i < tracks.length; i++) {
+        results.push(create_metadata_json(tracks[i]));
     }
+
+    const end_time = performance.now();
+    console.log(`Search for "${string}" took ${Math.ceil(end_time - start_time)}ms to complete.`);
 
     return res.send(results);
 
@@ -326,7 +406,6 @@ app.post("/search", (req, res) => {
     //    ...
     // ]
 });
-
 
 // Start server
 app.use(express.static(global.public_path));

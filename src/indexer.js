@@ -33,6 +33,8 @@ export const Indexer = new class {
                         .filter(dirent => dirent.isFile() && dirent.name.endsWith(".flac"));
 
         for (let i = 0; i < files.length; i++) {
+            const time_start = performance.now();
+            
             const file = files[i];
             const file_path = path.join(file.parentPath, file.name);
 
@@ -49,15 +51,40 @@ export const Indexer = new class {
             const frames = parser.parseAll(file_data);
             const num_blocks = Math.ceil(frames.length / block_size);
 
-            // Add artist if it does not exist yet
-            let artist = data.common.albumartist || data.common.artist || "Unknown";
-            let artist_id = database.get_artist_name(artist);
+            // Add artist(s) if it does not exist yet
+            let artists = data.common.artists || false;
+            let artist_ids = [];
+            let album_artist = data.common.albumartist || artists[0] || false;
 
-            if (!artist_id)
-                artist_id = database.create_artist(artist);
+            if (!artists) {
+                database.log_error("artist", file_path, "no artists found");
+                continue;
+            }
+
+            // Create album artist
+            let album_artist_id = database.get_artist_name(album_artist);
+
+            if (!album_artist_id)
+                album_artist_id = database.create_artist(album_artist);
+
+            // Create other artists
+            for (let i = 0; i < artists.length; i++) {
+                const artist = artists[i];
+                let artist_id = database.get_artist_name(artist);
+
+                if (!artist_id)
+                    artist_ids[i] = database.create_artist(artist);
+                else
+                    artist_ids[i] = artist_id;
+            }
 
             // Add album if it does not exist yet
-            let album = data.common.album || "Unknown";
+            let album = data.common.album || false;
+            if (!album) {
+                database.log_error("album", file_path, "no album found");
+                continue;
+            }
+
             let album_id = database.get_album_name(album);
 
             if (!album_id) {
@@ -72,15 +99,23 @@ export const Indexer = new class {
                 if (!album_image && data.common.picture)
                     album_image = data.common.picture[0].data;
 
-                album_id = database.create_album(album, artist_id, album_image);
+                // Get year
+                const album_year = data.common.year;
+
+                album_id = database.create_album(album, album_artist_id, album_image, album_year);
             }
 
             // Find track name
             let track = data.common.title;
-            if (!track)
-                track = file.name || "Unknown"; // Deduce title instead
+            if (!track) {
+                database.log_error("track", file_path, "no track title found");
+                continue;
+            }
 
-            let number = data.common.track.no || 1;
+            let number = data.common.track.no || 0;
+            if (!number) {
+                database.log_error("track", file_path, "no track number found");
+            }
             
             // Add track if it does not exist
             const track_id = database.create_track(track, number, album_id, file_path, {
@@ -89,6 +124,14 @@ export const Indexer = new class {
                 sample_rate: data.format.sampleRate,
                 num_blocks: num_blocks
             });
+
+            // Add track artists
+            for (let i = 0; i < artists.length; i++) {
+                const track_artist = database.create_track_artist(track_id, artist_ids[i]);
+                if (!track_artist)
+                    database.log_error("track_artist", file_path, `failed to add track artist "${artists[i]}"`);
+            }
+
 
             // Then add track data.
             let tot_size = 0;
@@ -144,10 +187,21 @@ export const Indexer = new class {
                 tot_blocks += block_frames.length;
             }
 
-            console.log(`Indexed track #${track_id} ["${track}"]\nTotal blocks: ${tot_blocks}\nSize (mb): ${Math.ceil(tot_size / 100000) / 10}\n`);
+            // Add track to search index
+            let keywords = "";
+    
+            keywords += `${track} ${number} ${album}`;
+            for (let i = 0; i < artists.length; i++) {
+                keywords += ` ${artists[i]}`;
+            }
+
+            database.create_search_entry(track_id, track, album, artists);
+
+            const time_end = performance.now();
+            console.log(`Indexed track #${track_id} ["${track}"]\nTotal blocks: ${tot_blocks}\nSize (mb): ${Math.ceil(tot_size / 100000) / 10}\nTook ${Math.floor(time_end - time_start)}ms to complete.\n`);
         }
         
-        console.log("\nTracks indexed.");
+        console.log(`\nTracks for "${directory}" indexed.`);
         return true;
     }
 

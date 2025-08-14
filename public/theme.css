@@ -3,9 +3,9 @@
 :root { /**  SETTINGS  **/
     /* Colors */
     --color-background: #111;
-    --color-background-glass: #1118;
+    --color-background-glass: #111B;
     --color-foreground: #FFF;
-    --color-foreground-glass: #FFF8;
+    --color-foreground-glass: #FFFB;
 
     --color-weak: #FFF4;
     --color-light: #FFF8;
@@ -14,7 +14,6 @@
     --color-strong: #FFFF;
 
     --border-color: #FFF2;
-    
 
     /* Text / Effect size */
     --text-size-title: min(2.2rem, 2.2vh);
@@ -26,6 +25,7 @@
     /* Fancy effects */
     --background-image-effect: contrast(110%) brightness(75%) saturate(120%);
     --background-image-blur: max(5vw, 5vh);
+    --glow: drop-shadow(#FFFA 0 0 0.8rem);
 
 
     /* Calculated values */
@@ -105,4 +105,6 @@ body {
 
     font-family: "Nebula Sans";
     font-variant-numeric: tabular-nums;
+
+    overflow: hidden; /* Bruh */
 }

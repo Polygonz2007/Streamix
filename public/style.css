@@ -13,13 +13,35 @@
     text-align: center;
 }
 
-#album-cover {
+#album-cover-container {
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 100%;
+    grid-template-rows: 100%;
+
     width: var(--album-cover-size);
     height: var(--album-cover-size);
 
     border: var(--border-default);
     box-shadow: #0006 0 0 12rem;
     border-radius: 3%;
+
+    overflow: hidden;
+}
+
+#album-cover-container > img {
+    grid-area: 1 / 1;
+
+    width: 100%;
+    height: 100%;
+}
+
+#album-cover-container > #loading {
+    background-color: #0006;
+    opacity: 0;
+    object-fit: scale-down;
+
+    transition: opacity 200ms;
 }
 
 h1 {
@@ -29,7 +51,8 @@ h1 {
 
     color: var(--color-strong);
 
-    margin: 0.9rem 0;
+    margin: 1.1rem 0;
+    padding: 0;
 }
 
 h2 {
@@ -38,7 +61,13 @@ h2 {
     text-shadow: #000B 0 0 3rem;
     text-wrap: balance;
 
-    margin: 0.7rem 0;
+    margin: 0.9rem 0;
+    padding: 0;
+}
+
+h2 > span {
+    color: var(--color-middle);
+    font-weight: 500;
 }
 
 hr {
@@ -51,8 +80,26 @@ hr {
 }
 
 
+a {
+    text-decoration: none;
+    color: var(--color-normal);
+
+    border-radius: 0.2rem;
+    padding: 0.2rem;
+    margin: -0.2rem;
+    transition: color, background-color 0.1s;
+}
+
+a:hover {
+    text-decoration: none;
+    color: var(--color-strong);
+
+    background-color: #BBB5;
+    cursor: pointer;
+}
+
 /**  BACKGROUND  **/
-#background, #background-image, #background-blur {
+#background {
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
@@ -60,21 +107,6 @@ hr {
 
     box-shadow: inset #0004 0 0 max(10vw, 10vh);
     user-select: none;
-}
-
-#background-image {
-    object-fit: cover;
-    filter: var(--background-image-effect);
-    -webkit-filter: var(--background-image-effect);
-
-    transform: scale(-1, -1);
-    -webkit-transform: scale(-1, -1);
-}
-
-#background-blur  {
-    backdrop-filter: blur(var(--background-image-blur)) contrast(85%);
-    -webkit-backdrop-filter: blur(var(--background-image-blur)) contrast(85%);
-    z-index: -998;
 }
 
 /**  CONTROLS  **/
@@ -87,6 +119,7 @@ hr {
     height: max-content;
 
     background-color: var(--color-background-glass);
+    backdrop-filter: blur(2rem);
 
     border: var(--border-default);
     border-bottom: none;
@@ -108,8 +141,46 @@ hr {
 }
 
 #seekbar {
+    position: relative;
     width: calc(100% - 8rem);
+    height: 1.5rem;
     margin: 0 1rem;
+
+    z-index: 1;
+}
+
+#seekbar-container:hover {
+    #seekbar > #dot {
+        filter: var(--glow);
+    }
+}
+
+#seekbar > #line {
+    position: absolute;
+
+    width: 100%;
+    height: 0.4rem;
+    
+    background-image: linear-gradient(to right, var(--color-weak), var(--color-weak));
+    border-radius: 0.3rem;
+
+    top: 50%;
+    transform: translate(0, -50%);
+}
+
+#seekbar > #dot {
+    position: absolute;
+
+    width: 0.7rem;
+    height: 1.7rem;
+
+    background-color: var(--color-strong);
+    border-radius: 0.7rem;
+
+    top: 50%;
+    transform: translate(-50%, -50%);
+
+    transition: filter 100ms;
 }
 
 /* Control Buttons */
@@ -126,6 +197,13 @@ hr {
     width: 3rem;
     height: 3rem;
     margin: 0 1rem;
+
+    transition: filter 200ms;
+}
+
+#control-buttons > *:hover {
+    filter: var(--glow);
+    cursor: pointer;
 }
 
 /* Control Button Icons */
@@ -148,6 +226,8 @@ input.image:active {
 #previous { background-image: url("/asset/controls/Previous.svg"); }
 #next { background-image: url("/asset/controls/Next.svg"); }
 
+#settings { background-image: url("/asset/icons/Settings.svg"); }
+
 
 
 
@@ -162,6 +242,7 @@ input.image:active {
     overflow: hidden;
 
     background-color: var(--color-background-glass);
+    backdrop-filter: blur(2rem);
 
     border: var(--border-default);
     border-left: none;
@@ -178,7 +259,7 @@ input.image:active {
 
 #library.loading {
     #body {
-        background-image: url("/asset/icons/loading.gif");
+        background-image: url("/asset/icons/Loading.gif");
         background-position: center;
         background-repeat: no-repeat;
     }
@@ -188,6 +269,26 @@ input.image:active {
     height: 3rem;
     width: calc(100% - 1rem);
     margin: 0.5rem;
+
+    background-color: var(--color-background-glass);
+    color: white;
+
+    border: inset 2px var(--border-color);
+    border-style: solid;
+    border-radius: 0.3rem;
+
+    box-sizing: border-box;
+    padding: 0.5rem;
+
+    font-size: 0.9rem;
+    font-family: "Nebula Sans";
+
+    transition: background-color 100ms;
+}
+
+#library > #search:focus {
+    outline: none;
+    background-color: var(--border-color);
 }
 
 #library > #body {
@@ -197,9 +298,10 @@ input.image:active {
 
     scrollbar-width: thin;
     scrollbar-color: #FFF2 #0000;
-    scroll-snap-type: y mandatory;
+    /*scroll-snap-type: y mandatory;*/
+    mask-image: linear-gradient(to bottom, #0000, #000F 1rem);
 
-    transition: scrollbar-color 100ms;
+    transition: scrollbar-color mask-image 100ms;
 }
 
 #library > #body:hover {
@@ -229,6 +331,8 @@ input.image:active {
 
 /* Phone Only */
 @media only screen and (max-width: 500px) {
+    
+
     #info {
         top: calc(50% - 3rem);
     }

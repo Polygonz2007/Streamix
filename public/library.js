@@ -2,6 +2,7 @@
 
 import Comms from "./comms.js";
 import Stream from "./stream.js";
+import UI from "./ui.js";
 
 const Library = new class {
     constructor() {
@@ -32,7 +33,12 @@ const Library = new class {
             //box.style.backgroundImage = `url("/album/${track_data.album.id}/256.jpg")`;
             
             const cover = document.createElement("img");
-            cover.src = `/album/${track_data.album.id}/${96 * window.devicePixelRatio}.jpg`;
+            const cover_size = 96 * window.devicePixelRatio;
+            let cover_url = UI.logo;
+            if (track_data.album.cover)
+                cover_url = `/album/${track_data.album.id}/${cover_size}.jpg`;
+
+            cover.src = cover_url;
 
             const info = document.createElement("div");
 
@@ -41,7 +47,7 @@ const Library = new class {
             title.classList.add("title");
 
             const artist = document.createElement("p");
-            artist.innerText = `Track by ${track_data.artist.name}`;
+            artist.innerText = `${track_data.album_artist.name}`;
             artist.classList.add("artist");
 
             const album = document.createElement("p");
@@ -74,24 +80,23 @@ const Library = new class {
 
     // Search
     async search(string) {
+        this.clear();
+        this.loading = true; //display loading thing
+
         const tracks = await Comms.post_json("/search", { "string": string });
-        let tracks_data = [];
 
-        Library.clear();
-        Library.loading = true; //display loading thing
+        //for (let i = 0; i < tracks.length; i++) {
+        //    const track = tracks[i]; //await Comms.fetch_json(`/track/${tracks[i].id}`);
+        //    //tracks_data.push(track);
+        //}
 
-        for (let i = 0; i < tracks.length; i++) {
-            const track = await Comms.get_json(`/track/${tracks[i].id}`);
-            tracks_data.push(track);
-        }
-
-        if (Library.search_bar.value != string)
+        if (this.search_bar.value != string)
             return; // too slow bud
 
-        Library.show_tracks(tracks_data);
-        Library.loading = false;
+        this.show_tracks(tracks);
+        this.loading = false;
 
-        return tracks_data;
+        return tracks;
     }
 }
 
