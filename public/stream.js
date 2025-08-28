@@ -1,6 +1,6 @@
 
-import Comms from "./comms.js";
-import UI from "./ui.js";
+import Comms from "/comms.js";
+import UI    from "/ui.js";
 
 class Track {
     constructor(id) {
@@ -294,8 +294,8 @@ export const Stream = new class {
             callback: callback
         });
 
-        function check() {
-            console.log("chcking!");
+        function check(once) {
+            //console.log("chcking!");
             const event_buf = this.events.slice(0); // So we dont mess up the REAL array when removing shit
             const current_time = this.context.currentTime;
 
@@ -309,14 +309,17 @@ export const Stream = new class {
                 this.events.splice(i, 1);
             }
 
-            if (this.events.length != 0)
+            if (this.events.length != 0 && !once)
                 requestAnimationFrame(check);
         }
 
+        check = check.bind(this);
+
         // If no check is running rn, start it
         if (num == 0) {
-            check = check.bind(this);
             check();
+        } else {
+            check(true); // or check once for good measure
         }
     }
 

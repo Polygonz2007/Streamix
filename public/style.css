@@ -9,7 +9,7 @@
     transform: translate(-50%, -50%);
     width: calc(var(--album-cover-size) * 1.3333);
 
-    z-index: -2;
+    z-index: 2;
     text-align: center;
 }
 
@@ -77,6 +77,7 @@ hr {
     width: calc(var(--album-cover-size) * 0.85);
     height: var(--border-thickness);
     background-color: var(--border-color);
+    border-radius: 1rem;
 }
 
 
@@ -236,6 +237,7 @@ input.image:active {
     position: fixed;
     left: 0; top: 50%;
     transform: translate(0, -50%);
+    z-index: 3;
 
     width: 24rem;
     height: calc(5rem + round(up, 60vh, 6.5rem + 2px) - 2px);

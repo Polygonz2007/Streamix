@@ -1,7 +1,7 @@
 // UI
 
-import Background from "./background.js";
-import { Stream, Queue } from "./stream.js";
+import Background from "/background.js";
+import { Stream, Queue } from "/stream.js";
 
 const Seekbar = new class {
     constructor() {
@@ -15,6 +15,7 @@ const Seekbar = new class {
         this._active = false; // Wether to render the dot or not.
         this._position = 0;
         this.duration = 1;
+        this.bar_length = 0;
     }
 
     get position() {
@@ -24,14 +25,22 @@ const Seekbar = new class {
     set position(val) {
         this._position = val;
 
+        // calculate pixels
+        const frac = this.position / this.duration;
+        const length = Math.round(frac * this.bar_length);
+
         // Update dot
-        this.dot.style.left = `${this.progress * 100}%`;
+        this.dot.style.left = `${length}px`;
 
         // Update gradient
         const gradient = `linear-gradient(to right, 
                             var(--color-light) 0%,
-                            var(--color-light) ${this.progress * 100}%,
-                            var(--color-weak) ${this.progress * 100}%,
+                            var(--color-light) calc(${length}px - 0.7rem),
+                            
+                            #0000 calc(${length}px - 0.7rem),
+                            #0000 calc(${length}px + 0.7rem),
+
+                            var(--color-weak) calc(${length}px + 0.7rem),
                             var(--color-weak) 100%
                         )`
         this.line.style.background = gradient;
@@ -51,6 +60,9 @@ const Seekbar = new class {
 
         this.dot.style.visibility = this.active ? "visible" : "hidden";
         this.line.style.backgroundColor = this.active ? "var(--color-weak)" : "var(--color-weak)";
+
+        // Set size of seekbar
+        this.bar_length = this.div.getBoundingClientRect().width;
     }
 }
 
@@ -141,8 +153,8 @@ const UI = new class {
         if (track.album.cover) {
             // Update image cover
             this.info.cover.setAttribute("src", cover_url);
-            this.info.cover.style.objectFit = "none"; // Render image sharp!
-            this.info.cover.style.scale = 1 / window.devicePixelRatio;
+            //this.info.cover.style.objectFit = "none"; // Render image sharp!
+            //this.info.cover.style.scale = 1 / window.devicePixelRatio;
 
             // Update background
             Background.src = cover_url;

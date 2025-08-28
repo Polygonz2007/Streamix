@@ -1,6 +1,6 @@
 // Communication with server.
 
-import Utils from "./util.js";
+import Utils from "/util.js";
 
 const Comms = new class {
     constructor() {
@@ -16,8 +16,8 @@ const Comms = new class {
         });
 
         // Reconnecting info
-        this.reconnect_time_init = 2000;
-        this.reconnect_time_mult = 1.2; // Wait 1, 2, 4, 8, 16 seconds to reconnect...
+        this.reconnect_time_init = 5000;
+        this.reconnect_time_mult = 1.1; // Wait 1, 2, 4, 8, 16 seconds to reconnect...
         this.reconnect_time = this.reconnect_time_init;
 
         this.current_req_id = 0;
@@ -172,6 +172,30 @@ const Comms = new class {
         this.reqs.splice(req_pos, 1);
         return true;
     }
+
+    async register_sw() {
+        if ("serviceWorker" in navigator) {
+            try {
+                const registration = await navigator.serviceWorker.register("/sw.js", {
+                scope: "/",
+                });
+                if (registration.installing) {
+                console.log("Service worker installing...");
+                } else if (registration.waiting) {
+                console.log("Service worker installed.");
+                } else if (registration.active) {
+                console.log("Service worker active.");
+                }
+            } catch (error) {
+                console.error(`Registration failed with ${error}.`);
+            }
+        }
+    }
 }
 
+
+// Enable caching of fetch requests
+Comms.register_sw();
+
+// Export
 export default Comms;
