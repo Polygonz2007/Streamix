@@ -26,6 +26,7 @@
     "express-session": "^1.18.1",
     "fs": "^0.0.1-security",
     "music-metadata": "^11.2.0",
+    "opus-decoder": "^0.7.10",
     "path": "^0.12.7",
     "sharp": "^0.34.3",
     "uint8array-extras": "^1.4.0",

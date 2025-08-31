@@ -206,21 +206,29 @@ export const Stream = new class {
         this.track_id;
 
         // Global playback data
-        this.desired_headroom = 48; // How many buffers to load in advance
+        this.desired_headroom = 96; // How many buffers to load in advance
         this._headroom = 0; // How many buffers are loaded after the current one
 
         this.sources = [];
         this.events = [];
     }
 
-    async load_flac_decoder() {
-        // Load FLAC decoder
+    async load_decoders() {
+        // get
         const { FLACDecoderWebWorker, FLACDecoder } = window["flac-decoder"];
+        const { OpusDecoder } = window["opus-decoder"];
 
-        this.decoder = new FLACDecoder();
-        await this.decoder.ready;
+        // create
+        this.decoders = {};
+        this.decoders.flac = new FLACDecoder();
+        this.decoders.opus = new OggOpusDecoder();
 
-        console.log("WASM FLAC Decoder ready!")
+        // load
+        await this.decoders.flac.ready;
+        await this.decoders.opus.ready;
+
+        // Good!
+        console.log("Flac and Opus decoders loaded!");
     }
 
     async play(track_id) {
@@ -455,10 +463,10 @@ export const Stream = new class {
         }
 
         // Decode data
-        if (!this.decoder.ready)
+        if (!this.decoders.flac.ready)
             return;
 
-        const decoded = await this.decoder.decodeFrames(frames);
+        const decoded = await this.decoders.flac.decodeFrames(frames);
 
         return decoded;
     }
@@ -494,7 +502,7 @@ export const Stream = new class {
 }
 
 // Load decoders
-await Stream.load_flac_decoder();
+await Stream.load_decoders();
 
 export default Stream;
 window.stream = Stream;

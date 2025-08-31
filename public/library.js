@@ -84,6 +84,11 @@ const Library = new class {
         this.loading = true; //display loading thing
 
         const tracks = await Comms.post_json("/search", { "string": string });
+        if (!tracks) {
+            this.loading = false;
+            this.body.innerHTML = "Not connected.";
+            return;
+        }
 
         //for (let i = 0; i < tracks.length; i++) {
         //    const track = tracks[i]; //await Comms.fetch_json(`/track/${tracks[i].id}`);

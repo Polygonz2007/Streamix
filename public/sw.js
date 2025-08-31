@@ -13,7 +13,24 @@ async function networkFirst(request) {
     }
 }
 
+async function cacheFirst(request) {
+    const responseFromCache = await caches.match(request);
+    if (responseFromCache)
+        return responseFromCache;
+
+    return fetch(request);
+};
+
 self.addEventListener("fetch", (event) => {
+    const req = event.request;
     const url = new URL(event.request.url);
-    event.respondWith(networkFirst(event.request));
+
+    // Tracks and stuff
+
+    
+    // Fonts always cached!
+    if (url.endsWith(".tff"))
+        return event.respondWith(cacheFirst(req));
+
+    return event.respondWith(networkFirst(req));
 });
