@@ -11,16 +11,22 @@ dotenv.config();
 
 // Imports
 import fs from "fs";
-import * as stats from "./src/stats.js";
+import Stats from "./src/stats.js";
 import * as database from "./src/database.js";
 import { Indexer } from "./src/indexer.js";
+import Stream from "./src/stream.js";
+import * as wsi from "./src/wsi.js";
 
+// Let us do stats
+await Stats.load();
+
+// Open database
 database.open();
 
 // Find and scan directories
 (async () => {
     const music_path = process.env.music_path;
-    let music_dirs = music_path.split(";");
+    let music_dirs = music_path.slice(1, -2).split(";");
     for (let i = 0; i < music_dirs.length; i++) {
         music_dirs[i] = music_dirs[i].trim();
         await Indexer.scan(music_dirs[i]);
@@ -75,6 +81,7 @@ import Sharp from "sharp";
 
 // WebSockets
 import WebSocket, { WebSocketServer } from 'ws';
+import { start } from "repl";
 global.wss = new WebSocketServer({ noServer: true });
 
 http_server.on('upgrade', upgrade_websocket);
@@ -100,6 +107,10 @@ function upgrade_websocket(request, socket, head) {
 
 wss.on('connection', (ws, req) => {
 
+    // Create a stream thingy for them 🥰🥰🥰🥰🥰🥰🥰
+    req.session.stream = new Stream();//🥰
+    req.session.stream.load(); //heartwarming🥰
+
     ws.on('message', async (data, isBinary) => {
         const start_time = performance.now();
 
@@ -110,53 +121,21 @@ wss.on('connection', (ws, req) => {
         // Get important stuff
         const client = req.session;
         const req_id = data.req_id;
+        const type = data.type;
 
-        // Validate
-        const track_id = parseInt(data.track_id) || -1;
-        //if (track_id <= 0)
-        //    return;
-
-        const block_index = parseInt(data.block_index);
-        //if (block_index < 0)
-        //    return;
-
-        // Get format
-        let format = data.format || 1;
-
-        // Get data
-        const result = database.get_track_data(track_id, 0, block_index);
-
-        // If we dont have any frames, the song is done
-        if (!result) {
-            format = 0; // Answer with format 0. Don't get or send any data
+        // Switch case
+        let result;
+        switch (type) {
+            case 0: result = await wsi.set_track(client, data); break;
+            case 1: result = await wsi.next_buffer(client, data); break;
+            case 4: result = await wsi.seek_to(client, data); break;
+            case 8: result = await wsi.log_played(client, data); break;
         }
-            
 
-        const num_frames = result.num_frames || 0;
-        const block_size = result.block_size || 0;
-        const block_data = result.block_data;
-
-        // Create buffer with message type and buffer index and frame data
-        const metadata_size = 4;
-        const buffer = Buffer.alloc(metadata_size + block_size);
-
-        // Write metadata - IIFN
-        buffer.writeUInt16LE(req_id, 0);  // Request ID
-        buffer.writeUInt8(format, 2);     // Format (1: MAX Flac)
-        buffer.writeUInt8(num_frames, 3); // Number of frames (max 255)
-
-        // Copy data into buffer (frame lengths and data)
-        if (format != 0) {
-            let offset = metadata_size;
-            Buffer.from(block_data).copy(buffer, offset);
-        }
-        
-        // Send to client
-        stats.log_event("buffer_get");
         const end_time = performance.now();
-        console.log(`=> Block #${block_index} [Track ${track_id}] took ${Math.ceil(end_time - start_time)}ms to process.`);
+        console.log(`${(end_time - start_time).toFixed(2)}ms => Req #${req_id} from ... of type ${type}`);
 
-        return ws.send(buffer);
+        ws.send(result);
     });
 
     ws.on('close', () => {
@@ -183,13 +162,18 @@ function prepare_json(type, data) {
 
 // Stats
 app.get("*", (req, res, next) => {
-    stats.log_event("http_get");
+    Stats.log("http_get");
     return next();
 });
 
 // Routes
 app.get("/stats", (req, res) => {
-    return res.send(stats.stats);
+    return res.send(`
+        <h1>horrible stats page</h1>
+        <p>Server has started up ${Stats.stats.startups} times...!</p>
+        <p>A total of ${Math.round(Stats.stats.buffer_get / 1_000_00) / 10} MB has been transferred over ${Stats.stats.num_buffers} buffers.</p>
+        <p>HTTP requests: ${Stats.stats.http_get}!!!</p>
+    `);
 });
 
 
@@ -407,10 +391,20 @@ app.post("/search", (req, res) => {
     // ]
 });
 
+
+
+
+
+
+
+
+
+
 // Start server
 app.use(express.static(global.public_path));
 http_server.listen(config.http_port, () => {
     console.log(`HTTP server running on ${config.http_port}.`);
+    Stats.log("startups");
 });
 
 //https_server.listen(config.https_port, () => {
@@ -424,5 +418,9 @@ process.on('SIGINT', shut_down);
 function shut_down() {
     console.log("Stopping!");
     console.log("Saving stats...")
+
+    // bro lagre json
+    Stats.save();
+
     process.exit(0);
 }

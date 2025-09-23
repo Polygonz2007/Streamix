@@ -185,10 +185,11 @@ export const Stream = new class {
         this.formats = [
             "No data",
             "Max [Flac]",
-            "CD [Flac]",
+            "CD [Flac, 44.1 khz, 16 bit]",
             "High [Opus, 384 kbps]",
             "Medium [Opus, 192 kbps]",
-            "Low [Opus, 96 kbps]"
+            "Low [Opus, 96 kbps]",
+            "Absolute fucking trash [Opus, 8 kbps]"
         ]
 
         // Debug
@@ -221,7 +222,7 @@ export const Stream = new class {
         // create
         this.decoders = {};
         this.decoders.flac = new FLACDecoder();
-        this.decoders.opus = new OggOpusDecoder();
+        this.decoders.opus = new OpusDecoder();
 
         // load
         await this.decoders.flac.ready;
@@ -290,6 +291,8 @@ export const Stream = new class {
     }
 
     check_headroom() {
+        console.log("chekcing headroom")
+
         if (this.headroom < this.desired_headroom)
             this.get_next_buffer();
     }
@@ -332,6 +335,8 @@ export const Stream = new class {
     }
 
     async get_next_buffer() {
+        console.log("get")
+
         // Figure out what the next buffer is. (check track block quantity, and then queue)
         const { track_id, track_index, block_index } = Queue.next();
         if (!track_id)
@@ -339,25 +344,38 @@ export const Stream = new class {
 
         const track = Queue.tracks[track_index];
 
+        // Switch track
+        if (block_index == 0) {
+            await Comms.ws_req({
+                type: 0,
+                track_id: track.id
+            });
+        }
+
+        console.log("changed track")
+
         const start = performance.now(); // Timing
         
         // Request it (get from cache or server)
-        const data = await Comms.get_buffer({
-            track_id: track_id,
-            block_index: block_index,
-            format: 1 // Flac MAX delicuiussy
+        const data = await Comms.ws_req({
+            type: 1, // get buffer
+            format: 3 // opus high idk // Flac MAX
         });
 
         const transfer = performance.now(); // Timing
 
+        console.log("now todecing")
+
         // Decode
         const decoded = await this.decode_data(data);
         if (decoded.error) {
+            console.log("deocde error")
             console.error(decoded.error)
             return; // make sure it stops idk
         }
 
         const decode = performance.now(); // Timing
+        console.log("decoded")
 
         // Create source and set to start
         const source = await this.create_source(decoded.channelData, decoded.samplesDecoded, decoded.sampleRate);
@@ -368,13 +386,14 @@ export const Stream = new class {
         if (this.debug) {
             document.querySelector("#debug-info").innerHTML += `<p id="bi${block_index}">
                                                                     Block #${block_index}<br>
-                                                                    Start: ${Math.round(start_time * 100) / 100}s
+                                                                    Start: ${start_time.toFixed(2)}s
                                                                 </p>`;
         }
 
         // Update headroom
         this.headroom++;
         const index = this.sources.push(source);
+        console.log("ready")
 
         // Check buffering
         if (this.buffering && this.headroom == this.desired_headroom) {

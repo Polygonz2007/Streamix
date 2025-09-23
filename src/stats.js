@@ -1,15 +1,44 @@
 // Handles logging and storing and stuff of statistics.
 
+import { existsSync, readFileSync, stat, writeFileSync } from "fs";
+import { json } from "stream/consumers";
+
 // For now only per session!
 // TODO: Convert to a class
 
-export let stats = {};
+const stats_path = "./stats.json";
 
-export function log_event(event_name) {
-    if (stats[event_name])
-        stats[event_name]++;
-    else
-        stats[event_name] = 1;
+const Stats = new class {
+    constructor() {
+        this.stats = {};
+    }
 
-    return true;
+    async load() {
+        // Load stats
+        if (!existsSync(stats_path))
+            return;
+
+        let data = readFileSync(stats_path);
+        data = JSON.parse(data);
+        this.stats = data;
+    }
+
+    async log(event, amount) {
+        if (!amount)
+            amount = 1;
+
+        if (!this.stats[event])
+            this.stats[event] = 0;
+
+        this.stats[event] += amount;
+
+        return;
+    }
+
+    async save() {
+        const data = JSON.stringify(this.stats);
+        writeFileSync(stats_path, data);
+    }
 }
+
+export default Stats;

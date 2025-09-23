@@ -13,7 +13,7 @@ export const Indexer = new class {
     //}
 
     async scan(directory) {
-        console.log("Indexing tracks...");
+        console.log(`Indexing tracks from "${directory}"...`);
 
         // Check if directory exists
         if (!existsSync(directory)) {

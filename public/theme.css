@@ -3,9 +3,9 @@
 :root { /**  SETTINGS  **/
     /* Colors */
     --color-background: #111;
-    --color-background-glass: #111B;
+    --color-background-glass: #1118;
     --color-foreground: #FFF;
-    --color-foreground-glass: #FFFB;
+    --color-foreground-glass: #FFF8;
 
     --color-weak: #FFF4;
     --color-light: #FFF8;
@@ -19,7 +19,7 @@
     --text-size-title: min(2.2rem, 2.2vh);
     --text-size-subtitle: min(1.3rem, 1.3vh);
 
-    --border-thickness: 0.2rem;
+    --border-thickness: 2px;
 
 
     /* Fancy effects */
