@@ -28,6 +28,12 @@ const Comms = new class {
 
         // Connect to Websocket server
         this.connect_ws();
+
+        // Debug
+        this.total_transfer = 0;
+        this.transfer_rate = 0;
+        this.transfer_time = performance.now();
+        this.prev_transfer_time = this.transfer_time;
     }
 
     async connect_ws() {
@@ -163,9 +169,24 @@ const Comms = new class {
         if (!req)
             return false;
 
-        // Log time taken
-        const after = Date.now();
-        //console.log(`Buffer Request #${req.req_id}\nTrip time: ${after - req.time_sent}ms`);
+        // Log size and update debug info
+        //console.log(this.total_transfer)
+        this.total_transfer += data.byteLength;
+        const mb = this.total_transfer / 1_000_000;
+
+        let delta = performance.now() - this.prev_transfer_time; // ms
+        if (delta < 1)
+            delta = 1;
+
+        delta /= 1000;
+
+        this.transfer_rate = this.transfer_rate * 0.5 + (data.byteLength / delta) * 0.5; // lerp, and keep track of seconds
+        
+        const debug_info = document.querySelector("#debug-info");
+        if (debug_info)
+            debug_info.innerHTML = `Transfer total: ${mb.toFixed(1)} mb<br>Transfer rate:  ${(this.transfer_rate / (1000 / 8)).toFixed(1)} kbps`;
+
+        this.prev_transfer_time = performance.now();
 
         // Do it
         console.log(`bro ${req_id} came back to us `);

@@ -179,7 +179,7 @@ app.get("/stats", (req, res) => {
 
 // App Icon
 app.get("/favicon.ico", (req, res) => {
-    return res.sendFile(path.join(public_path, "asset/logo/192/Summer Round.png"));
+    return res.sendFile(path.join(public_path, "asset/logo/192/Winter Round.png"));
 });
 
 

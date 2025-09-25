@@ -73,7 +73,7 @@ const UI = new class {
         this._loading = false;
 
         // Assets
-        this.logo = "/asset/logo/512/Summer.png";
+        this.logo = "/asset/logo/512/Winter.png";
         this.album_id;
 
         this.info_loaded = false;

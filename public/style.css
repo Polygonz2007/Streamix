@@ -150,7 +150,9 @@ a:hover {
     z-index: 1;
 }
 
-#seekbar-container:hover {
+#seekbar:hover {
+    cursor: pointer;
+
     #seekbar > #dot {
         filter: var(--glow);
     }

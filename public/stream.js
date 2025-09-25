@@ -159,6 +159,61 @@ export const Queue = new class {
     }
 }
 
+export const MediaSession = new class {
+    constructor() {
+        return this;
+    }
+
+    set(track) {
+        console.log("DOIN MEDIA SESH")
+
+        if (!navigator.mediaSession)
+            return;
+
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: track.title,
+            artist: track.album_artist.name,
+            album: track.album.name,
+            artwork: [
+                {
+                    src: `/album/${track.album.id}/1024.jpg`,
+                    sizes: "1024x1024",
+                    type: "image/jpg"
+                }
+            ]
+        });
+
+        navigator.mediaSession.setActionHandler("play", () => {
+            Stream.paused = false;
+
+            navigator.mediaSession.setPositionState({
+                duration: track.duration,
+                playbackRate: 1,
+                position: Stream.played_time,
+                state: "playing"
+            });
+        });
+
+        navigator.mediaSession.setActionHandler("pause", () => {
+            Stream.paused = true;
+
+            navigator.mediaSession.setPositionState({
+                duration: track.duration,
+                playbackRate: 1,
+                position: Stream.played_time,
+                state: "paused"
+            });
+        });
+
+        navigator.mediaSession.setPositionState({
+            duration: track.duration,
+            playbackRate: 1,
+            position: 0,
+            state: "playing"
+        });
+    }
+}
+
 
 export const Stream = new class {
     constructor() {
@@ -269,6 +324,13 @@ export const Stream = new class {
         return this._paused;
     }
 
+    get played_time() {
+        const start_time = Queue.playing.start_time; // Replace with getting the one that is displayed.
+        const current_time = Stream.context.currentTime;
+
+        return current_time - start_time;
+    }
+
     set headroom(num) {
         this._headroom = num;
         this.check_headroom();
@@ -359,7 +421,7 @@ export const Stream = new class {
         // Request it (get from cache or server)
         const data = await Comms.ws_req({
             type: 1, // get buffer
-            format: 3 // opus high idk // Flac MAX
+            format: 1 // opus high idk // Flac MAX
         });
 
         const transfer = performance.now(); // Timing
@@ -423,6 +485,7 @@ export const Stream = new class {
 
                 // Show track info
                 UI.set_info(track);
+                MediaSession.set(track);
             }
         });
 

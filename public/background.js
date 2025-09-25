@@ -23,7 +23,7 @@ const Convolver = class {
         // First convolution (Horizontal)
         let buffer = this.image_data;
         let kernel_size = this.kernel_x.length;
-        let offset = Math.floor(kernel_size / 2);
+        let offset = Math.round(kernel_size / 2);
         console.log(`kernel is ${kernel_size} and offset is ${offset}`)
 
         for (let x = 0; x < this.width; x++) {
@@ -46,7 +46,7 @@ const Convolver = class {
         // Second convolution (Vertical)
         buffer = this.image_data;
         kernel_size = this.kernel_y.length;
-        offset = Math.floor(kernel_size / 2);
+        offset = Math.round(kernel_size / 2);
 
         for (let x = 0; x < this.width; x++) {
             for (let y = 0; y < this.height; y++) {
@@ -164,29 +164,48 @@ const Background = new class {
     }
 
     // Blurs the image.
-    blur(amount) {
-        //amount /= this.downsample;
-        console.log("Blur by " + amount + " px")
+    blur(sigma) {
+        ////amount /= this.downsample;
+        //console.log("Blur by " + amount + " px")
+//
+        //// Odd number
+        //if (amount % 2 == 0)
+        //    amount++;
+//
+        //// Generate kernel
+        //let kernel = [];
+        //let sigma = amount / 2;
+        //let sum = 0;
+//
+        //// Generate values
+        //for (let i = 0; i < amount; i++) {
+        //    const val = this.gaussian(i, amount, sigma)
+        //    sum += val;
+        //    kernel.push(val);
+        //}
+//
+        //// Normalize
+        //for (let i = 0; i < amount; i++) {
+        //    kernel[i] = kernel[i] / sum;
+        //}
 
-        // Odd number
-        if (amount % 2 == 0)
-            amount++;
-
-        // Generate kernel
-        let kernel = [];
-        let sigma = amount / 2;
-        let sum = 0;
-
-        // Generate values
-        for (let i = 0; i < amount; i++) {
-            const val = Math.pow(this.gaussian(i, amount, sigma), 2);
-            sum += val;
-            kernel.push(val);
+        const GAUSSKERN = 6.0;
+        let dim = parseInt(Math.max(3.0, GAUSSKERN * sigma));
+        let sqrtSigmaPi2 = Math.sqrt(Math.PI*2.0)*sigma;
+        let s2 = 2.0 * sigma * sigma;
+        let sum = 0.0;
+        
+        let kernel = new Float32Array(dim - !(dim & 1)); // Make it odd number
+        const half = parseInt(kernel.length / 2);
+        for (let j = 0, i = -half; j < kernel.length; i++, j++) 
+        {
+            kernel[j] = Math.exp(-(i*i)/(s2)) / sqrtSigmaPi2;
+            sum += kernel[j];
         }
 
-        // Normalize
-        for (let i = 0; i < amount; i++) {
-            kernel[i] = kernel[i] / sum;
+        // Normalize the gaussian kernel to prevent image darkening/brightening
+        for (let i = 0; i < dim; i++) {
+            kernel[i] /= sum;
         }
 
         // Convolve
@@ -244,7 +263,7 @@ const Background = new class {
         this.context.drawImage(img, start_x, start_y, size_x, size_y, 0, 0, -this.screen.width, this.screen.height);
 
         // Blur
-        const blur_percent = 0.16;
+        const blur_percent = 0.035;
         this.blur(Math.ceil(Math.max(this.screen.width, this.screen.height) * blur_percent));
 
         // Brightness and contrast
