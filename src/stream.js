@@ -107,11 +107,9 @@ const Stream = class {
 
         // Create buffer
         // If we dont have any frames, the song is done
-        if (!result) {
+        if (!result)
             format = 0; // Answer with format 0. Don't get or send any data
-        }
         
-        console.log(result)
         const num_frames = result.num_frames || 0;
         const block_size = result.block_size || 0;
         const block_data = result.block_data;
@@ -122,7 +120,6 @@ const Stream = class {
         const buffer = Buffer.alloc(total_size);
 
         // Write metadata - IIFN
-        console.log(`REQUEST ID ${data.req_id}`)
         buffer.writeUInt16LE(data.req_id, 0);  // Request ID
         buffer.writeUInt8(format, 2);     // Format (0: no data, 1: MAX Flac, 2: CD flac)
         buffer.writeUInt8(num_frames, 3); // Number of frames (max 255)
@@ -150,7 +147,7 @@ const Stream = class {
     }
 
     async get_next_data(decode) {
-        console.log(`Fetching block data for track #${this.track_id} at block id #${this.block_index}`)
+        //console.log(`Fetching block data for track #${this.track_id} at block id #${this.block_index}`)
 
         // Get data and increment block index
         const result = database.get_track_data(this.track_id, 0, this.block_index);
@@ -162,7 +159,6 @@ const Stream = class {
     
         // Decode into samples and return
         // Return as normal array for now :sob:
-        console.log(result)
         const data = result.block_data;
 
         // Split data into frames

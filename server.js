@@ -111,6 +111,8 @@ wss.on('connection', (ws, req) => {
     req.session.stream = new Stream();//🥰
     req.session.stream.load(); //heartwarming🥰
 
+    req.session.ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
     ws.on('message', async (data, isBinary) => {
         const start_time = performance.now();
 
@@ -133,7 +135,7 @@ wss.on('connection', (ws, req) => {
         }
 
         const end_time = performance.now();
-        console.log(`${(end_time - start_time).toFixed(2)}ms => Req #${req_id} from ... of type ${type}`);
+        console.log(`${(end_time - start_time).toFixed(2)}ms => Req #${req_id} from ${req.session.ip} of type ${type}`);
 
         ws.send(result);
     });

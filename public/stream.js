@@ -469,12 +469,6 @@ export const Stream = new class {
 
         // Started
         this.attach_time_event(start_time, () => {
-            if (this.debug) {
-                const elem = document.querySelector(`#debug-info > #bi${block_index}`)
-                if (elem)
-                    elem.setAttribute("class", "playing");
-            }
-
             // When track starts
             if (block_index == 0) {
                 // Set playing index
@@ -493,9 +487,6 @@ export const Stream = new class {
         source.addEventListener("ended", () => {
             this.headroom--;
 
-            if (this.debug)
-                document.querySelector(`#debug-info > #bi${block_index}`).setAttribute("class", "done");
-            
             // Pause when out of buffers
             if (this.headroom == 0) {
                 this.paused = true;
@@ -515,11 +506,6 @@ export const Stream = new class {
             // Remove shit
             this.sources.splice(index);
             delete source.buffer;
-
-            // Remove a previous one
-            const old = document.querySelector(`#debug-info > #bi${block_index - 2}`);
-            if (old)
-                old.remove();
             
         });
     }

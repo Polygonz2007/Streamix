@@ -3,7 +3,7 @@
 :root { /**  SETTINGS  **/
     /* Colors */
     --color-background: #111;
-    --color-background-glass: #1118;
+    --color-background-glass: #000A;
     --color-foreground: #FFF;
     --color-foreground-glass: #FFF8;
 
@@ -13,7 +13,7 @@
     --color-normal: #FFFE;
     --color-strong: #FFFF;
 
-    --border-color: #FFF2;
+    --border-color: #FFF1;
 
     /* Text / Effect size */
     --text-size-title: min(2.2rem, 2.2vh);
