@@ -240,11 +240,11 @@ export const Stream = new class {
         this.formats = [
             "No data",
             "Max [Flac]",
-            "CD [Flac, 44.1 khz, 16 bit]",
+            "CD [Flac]",
             "High [Opus, 384 kbps]",
             "Medium [Opus, 192 kbps]",
             "Low [Opus, 96 kbps]",
-            "Absolute fucking trash [Opus, 8 kbps]"
+            "Trash [Opus, 8 kbps]"
         ]
 
         // Debug

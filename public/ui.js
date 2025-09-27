@@ -177,7 +177,7 @@ const UI = new class {
         // Set text
         this.info.title.innerText = "Streamix";
         this.info.artist.innerHTML = `<span>Quality: </span><a>${Stream.formats[Stream.format]}</a>`;
-        this.info.album.innerHTML = `<span>Cache: </span><a>3.02GB [23% full]</a>`;
+        this.info.album.innerHTML = `<span>Cache: </span><a>Disabled</a>`;//0.00GB [0% full]</a>`;
 
         // Set album cover
         this.info.cover.setAttribute("src", this.logo);
