@@ -9,3 +9,6 @@ certs/*
 src/streamix.db
 src/streamix.db-shm
 src/streamix.db-wal
+
+# Stats
+stats.json

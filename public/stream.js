@@ -12,7 +12,7 @@ class Track {
         this.loaded = false;
         this.id = id;
 
-        this.block_index = -1;
+        this.frame_index = -1;
         this.start_time = 0;
     }
 
@@ -31,7 +31,7 @@ class Track {
         // Store info
         this.sample_rate = track_format.sample_rate;
         this.duration = track_format.duration;
-        this.num_blocks = track_format.num_blocks;
+        this.num_frames = track_format.num_frames;
         this.block_durations = track_format.block_durations;
 
         this.title = track_meta.track.name;
@@ -50,25 +50,27 @@ class Track {
         // Get info
         result.sample_rate = buffer_view.getUint32(0, true); // SAMPLE RATE
         result.duration = buffer_view.getFloat32(4, true); // DURATION
-        result.num_blocks = buffer_view.getUint16(8, true); // NUM_BLOCKS
+        result.num_frames = buffer_view.getUint16(8, true); // NUM_FRAMES
         result.block_durations = [];
 
         // Get all block durations
         let offset = 10;
-        for (let i = 0; i < result.num_blocks; i++) {
+        for (let i = 0; i < result.num_frames; i++) {
             result.block_durations.push(buffer_view.getFloat32(offset, true)); // BLOCK DURATIONS
             offset += 4;
         }
 
+        console.log(`TRACK HAS ${result.sample_rate} SMPLR RATE AND ${result.duration} DURATION AND ${result.num_frames} FRAMES`);
+
         return result;
     }
 
-    get_block_time(block_index) {
-        if (block_index < 0 || block_index > this.num_blocks)
+    get_block_time(frame_index) {
+        if (frame_index < 0 || frame_index > this.num_frames)
             return 0;
 
         let time = 0;
-        for (let i = 0; i < block_index; i++) {
+        for (let i = 0; i < frame_index; i++) {
             time += this.block_durations[i];
         }
 
@@ -128,18 +130,18 @@ export const Queue = new class {
             return false;
 
         // Next track
-        if (this.active_index < 0 || this.current.block_index > this.current.num_blocks)
+        if (this.active_index < 0 || this.current.frame_index > this.current.num_frames)
             this.active_index++;
 
         const current_track = this.current;
         if (!current_track)
             return false;
 
-        current_track.block_index++;
+        current_track.frame_index++;
 
         return {
             track_id: current_track.id,
-            block_index: current_track.block_index,
+            frame_index: current_track.frame_index,
             track_index: this.active_index
         };
     }
@@ -257,7 +259,7 @@ export const Stream = new class {
         
         this.volume = 1;
         this.buffer_time = 0;
-        this.block_index = 0;
+        this.frame_index = 0;
 
         this.track_id;
 
@@ -400,14 +402,14 @@ export const Stream = new class {
         console.log("get")
 
         // Figure out what the next buffer is. (check track block quantity, and then queue)
-        const { track_id, track_index, block_index } = Queue.next();
+        const { track_id, track_index, frame_index } = Queue.next();
         if (!track_id)
             return; // No more to be played!
 
         const track = Queue.tracks[track_index];
 
         // Switch track
-        if (block_index == 0) {
+        if (frame_index == 0) {
             await Comms.ws_req({
                 type: 0,
                 track_id: track.id
@@ -440,14 +442,15 @@ export const Stream = new class {
         console.log("decoded")
 
         // Create source and set to start
+        console.log(decoded)
         const source = await this.create_source(decoded.channelData, decoded.samplesDecoded, decoded.sampleRate);
-        const start_time = Queue.time_offset + Queue.current.get_block_time(block_index);
+        const start_time = Queue.time_offset + Queue.current.get_block_time(frame_index);
         source.start(start_time);
 
         // info
         if (this.debug) {
-            document.querySelector("#debug-info").innerHTML += `<p id="bi${block_index}">
-                                                                    Block #${block_index}<br>
+            document.querySelector("#debug-info").innerHTML += `<p id="bi${frame_index}">
+                                                                    Block #${frame_index}<br>
                                                                     Start: ${start_time.toFixed(2)}s
                                                                 </p>`;
         }
@@ -464,13 +467,13 @@ export const Stream = new class {
         }
 
         // Tell track when it started
-        if (block_index == 0)
+        if (frame_index == 0)
             Queue.tracks[track_index].start_time = start_time;
 
         // Started
         this.attach_time_event(start_time, () => {
             // When track starts
-            if (block_index == 0) {
+            if (frame_index == 0) {
                 // Set playing index
                 Queue.playing_index = track_index;
 
@@ -492,8 +495,8 @@ export const Stream = new class {
                 this.paused = true;
 
                 // Set inactive when queue done
-                console.log(`Num tracks ${Queue.tracks.length} this track indexs ${track_index}\nBlock index ${block_index} num blocks ${track.num_blocks}`);
-                if (Queue.tracks.length - 1 == track_index && block_index == track.num_blocks - 1) {
+                console.log(`Num tracks ${Queue.tracks.length} this track indexs ${track_index}\nFrame index ${frame_index} num frames ${track.num_frames}`);
+                if (Queue.tracks.length - 1 == track_index && frame_index == track.num_frames - 1) {
                     this.active = false;
                     UI.clear_info();
                     UI.clear_seekbar();
@@ -511,30 +514,31 @@ export const Stream = new class {
     }
 
     async decode_data(data) {
-        const data_view = new DataView(data);
-
-        const format = data_view.getUint8(2); // IIFN
-        if (format == 0) // NO DATA
-            return {error: "No data present in this buffer."};
-        
-        // Split data into frames
-        let frames = [];
-        const frame_count = data_view.getUint8(3);
-        const metadata_size = 4 + frame_count * 2; // 6 bytes of metdata and then 2 * n bytes of lengths
-
-        let offset = metadata_size;
-        for (let i = 0; i < frame_count; i++) {
-            // Get and push frame to array
-            const length = data_view.getUint16(4 + i * 2, true);
-            frames.push(new Uint8Array(data, offset, length));
-            offset += length;
-        }
+        //const data_view = new DataView(data);
+//
+        //const format = data_view.getUint8(2); // IIFN
+        //if (format == 0) // NO DATA
+        //    return {error: "No data present in this buffer."};
+        //
+        //// Split data into frames
+        //let frames = [];
+        //const frame_count = data_view.getUint8(3);
+        //const metadata_size = 4 + frame_count * 2; // 6 bytes of metdata and then 2 * n bytes of lengths
+//
+        //let offset = metadata_size;
+        //for (let i = 0; i < frame_count; i++) {
+        //    // Get and push frame to array
+        //    const length = data_view.getUint16(4 + i * 2, true);
+        //    frames.push(new Uint8Array(data, offset, length));
+        //    offset += length;
+        //}
+        const frame = new Uint8Array(data, 2);
 
         // Decode data
         if (!this.decoders.flac.ready)
             return;
 
-        const decoded = await this.decoders.flac.decodeFrames(frames);
+        const decoded = await this.decoders.flac.decodeFrames(frame);
 
         return decoded;
     }

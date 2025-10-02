@@ -7,7 +7,7 @@ import { parseFile as parse_metadata } from 'music-metadata';
 import * as database from "./database.js";
 import codec_parser, { duration } from "codec-parser";
 
-export const Indexer = new class {
+const Indexer = new class {
     //constructor(auto_update) {
     //    this.auto_update = auto_update;
     //}
@@ -20,13 +20,6 @@ export const Indexer = new class {
             console.log("Indexing failed. Directory is not available.");
             return false;
         }
-
-        // Block size. Make sure it is within range
-        let block_size = parseInt(process.env.block_size) || 64;
-        if (block_size < 1)
-            block_size = 1;
-        if (block_size > 255)
-            block_size = 255;
 
         // Find all .flac files here, and print out metadata.
         const files = (await fs.readdir(directory, { withFileTypes: true, recursive: true }))
@@ -49,7 +42,7 @@ export const Indexer = new class {
             const parser = new codec_parser("audio/flac");
             const file_data = await fs.readFile(file_path);
             const frames = parser.parseAll(file_data);
-            const num_blocks = Math.ceil(frames.length / block_size);
+            const num_frames = frames.length;
 
             // Add artist(s) if it does not exist yet
             let artists = data.common.artists || false;
@@ -122,7 +115,7 @@ export const Indexer = new class {
                 duration: data.format.duration,
                 bitrate: data.format.bitrate,
                 sample_rate: data.format.sampleRate,
-                num_blocks: num_blocks
+                num_frames: num_frames
             });
 
             // Add track artists
@@ -135,57 +128,22 @@ export const Indexer = new class {
 
             // Then add track data.
             let tot_size = 0;
-            let tot_blocks = 0;
-
             const format = 0;
-            for (let index = 0; index < num_blocks; index++) {
-                // Gather frames into block
-                let block_frames = [];
-                let block_frames_size = 0;
-                let block_duration = 0;
 
-                // Get all the data
-                let num_frames = 0;
-                const frame_offset = index * block_size;
-                for (let fi = 0; fi < block_size; fi++) {
-                    const frame_index = frame_offset + fi;
-                    if (!frames[frame_index])
-                        continue;
-
-                    const frame_data = frames[frame_index].data;
-                    block_frames.push(frame_data);
-                    block_frames_size += frame_data.length;
-                    num_frames++;
-                    block_duration += frames[frame_index].duration;
-                }
-
-                // Create buffer, write frame lengths
-                const block_frame_lengths_size = num_frames * 2; // 16 bits
-                const buffer_size = block_frame_lengths_size + block_frames_size;
-                const block_data = Buffer.alloc(buffer_size);
-                for (let i = 0; i < num_frames; i++) {
-                    const length = block_frames[i].length;
-                    block_data.writeUint16LE(length, i * 2);
-                }
-
-                // Write data
-                let offset = block_frame_lengths_size;
-                for (let i = 0; i < block_frames.length; i++) {
-                    Buffer.from(block_frames[i]).copy(block_data, offset);
-                    offset += block_frames[i].length;
-                }
-
-                // Covert duration from ms to s.
-                block_duration /= 1000;
+            // TODO: START TRANSACTION (speed up adding frame data)
+            for (let index = 0; index < num_frames; index++) {
+                // Get frame data
+                const frame_data = frames[index].data;
+                const frame_duration = frames[index].duration;
 
                 // Add to database
-                const result = database.create_track_data(track_id, format, index, block_duration, num_frames, buffer_size, block_data);
+                const result = database.create_track_frame(track_id, format, index, frame_duration, frame_data);
                 if (!result)
-                    console.warn(`Error indexing block data for track "${track}" [ID ${track_id}] at index #${index}.`);
+                    console.warn(`Error indexing frame data for track "${track}" [ID ${track_id}] at index #${index}.`);
 
-                tot_size += block_frames_size;
-                tot_blocks += block_frames.length;
+                tot_size += frame_data.byteLength;
             }
+            // END TRANSACTION
 
             // Add track to search index
             let keywords = "";
@@ -198,7 +156,7 @@ export const Indexer = new class {
             database.create_search_entry(track_id, track, album, artists);
 
             const time_end = performance.now();
-            console.log(`Indexed track #${track_id} ["${track}"]\nTotal blocks: ${tot_blocks}\nSize (mb): ${Math.ceil(tot_size / 100000) / 10}\nTook ${Math.floor(time_end - time_start)}ms to complete.\n`);
+            console.log(`Indexed track #${track_id} ["${track}"]\nFrames: ${frames.length} [${data.format.duration.toFixed(0)}s]\nSize: ${Math.ceil(tot_size / 1_000_000).toFixed(2)} MB\nTook ${Math.floor(time_end - time_start)}ms to complete.\n`);
         }
         
         console.log(`\nTracks for "${directory}" indexed.`);
@@ -213,3 +171,4 @@ export const Indexer = new class {
     }
 }
 
+export default Indexer;

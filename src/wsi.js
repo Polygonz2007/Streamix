@@ -15,15 +15,17 @@ export async function set_track(client, data) {
 
 export async function next_buffer(client, data) {
     const format = data.format;
+    const audio_data = await client.stream.get_next_data();
 
-    if (data.format == 1)
-        return await client.stream.get_next_flac(data, false); // no downsample
-    else if (data.format == 2)
-        return await client.stream.get_next_flac(data, true); // downsample
-    else if (data.format >= 3)
-        return await client.stream.get_next_opus(data);
+    if (!audio_data)
+        return response(data.req_id, 1); // bad!!
 
-    return response(data.req_id, 1); // bad!!
+    // Add the req id to start
+    const buffer = Buffer.alloc(audio_data.byteLength + 2);
+    buffer.writeUint16LE(data.req_id, 0);
+    audio_data.copy(buffer, 2);
+
+    return buffer;
 }
 
 export async function seek_to(client, data) {

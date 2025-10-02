@@ -119,8 +119,8 @@ export function get_album_image(id) {
 
 // Tracks
 export function create_track(name, number, album_id, path, metadata) {
-    const query = db.prepare("INSERT INTO tracks (name, number, album_id, path, duration, bitrate, sample_rate, num_blocks) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    const result = query.run(name, number, album_id, path, metadata.duration, metadata.bitrate, metadata.sample_rate, metadata.num_blocks);
+    const query = db.prepare("INSERT INTO tracks (name, number, album_id, path, duration, bitrate, sample_rate, num_frames) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    const result = query.run(name, number, album_id, path, metadata.duration, metadata.bitrate, metadata.sample_rate, metadata.num_frames);
     if (result.changes == 0)
         return false;
 
@@ -170,7 +170,7 @@ export function get_track_format(id) {
     // Get format data
     const query = db.prepare(`SELECT 
                                 tracks.duration, tracks.bitrate,
-                                tracks.sample_rate, tracks.num_blocks
+                                tracks.sample_rate, tracks.num_frames
                             FROM tracks
                             WHERE tracks.id = ?`);
     let result = query.get(id);
@@ -178,19 +178,19 @@ export function get_track_format(id) {
         return false;
 
     // Construct block data
-    const block_query = db.prepare(`SELECT duration FROM track_data WHERE track_data.track_id = ? ORDER BY track_data.block_index ASC`);
-    const block_result = block_query.all(id);
-    if (!block_result)
+    const frame_query = db.prepare(`SELECT duration FROM track_frames WHERE track_frames.track_id = ? ORDER BY track_frames.frame_index ASC`);
+    const frame_result = frame_query.all(id);
+    if (!frame_result)
         console.log("shi idk");
 
-    const num_blocks = block_result.length;
-    const blocks = new Float32Array(num_blocks);
-    for (let i = 0; i < num_blocks; i++) {
-        blocks[i] = block_result[i].duration;
+    const num_frames = frame_result.length;
+    const frames = new Float32Array(num_frames);
+    for (let i = 0; i < num_frames; i++) {
+        frames[i] = frame_result[i].duration;
     }
 
     // Add to metadata
-    result.block_durations = blocks;
+    result.frame_durations = frames;
 
     return result;
 }
@@ -227,25 +227,25 @@ export function get_track_by_path(path) {
 }
 
 // Track data
-export function create_track_data(track_id, format, index, duration, num_frames, block_size, data) {
-    const query = db.prepare("INSERT INTO track_data (track_id, format, block_index, duration, num_frames, block_size, block_data) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    const result = query.run(track_id, format, index, duration, num_frames, block_size, data);
+export function create_track_frame(track_id, format, index, duration, data) {
+    const query = db.prepare("INSERT INTO track_frames (track_id, format, frame_index, duration, frame_data) VALUES (?, ?, ?, ?, ?)");
+    const result = query.run(track_id, format, index, duration, data);
     if (result.changes == 0)
         return false;
 
     return result.lastInsertRowid;
 }
 
-export function get_track_data(track_id, format, index) {
+export function get_track_frame(track_id, format, index) {
     format = 0;
 
     const query = db.prepare(`SELECT 
-                                num_frames, block_size, block_data
-                            FROM track_data 
+                                frame_data
+                            FROM track_frames 
                             WHERE 
-                                track_data.track_id = ? 
-                                AND track_data.format = ? 
-                                AND track_data.block_index = ?`);
+                                track_frames.track_id = ? 
+                                AND track_frames.format = ? 
+                                AND track_frames.frame_index = ?`);
     const result = query.get(track_id, format, index);
     if (!result)
         return false;

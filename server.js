@@ -10,10 +10,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // Imports
-import fs from "fs";
-import Stats from "./src/stats.js";
 import * as database from "./src/database.js";
-import { Indexer } from "./src/indexer.js";
+import Stats from "./src/stats.js";
+
+import Indexer from "./src/indexer.js";
 import Stream from "./src/stream.js";
 import * as wsi from "./src/wsi.js";
 
@@ -26,7 +26,7 @@ database.open();
 // Find and scan directories
 (async () => {
     const music_path = process.env.music_path;
-    let music_dirs = music_path.slice(1, -2).split(";");
+    let music_dirs = music_path.split(";");
     for (let i = 0; i < music_dirs.length; i++) {
         music_dirs[i] = music_dirs[i].trim();
         await Indexer.scan(music_dirs[i]);
@@ -65,23 +65,11 @@ app.use(express.json());
 import http, { Server } from "http";
 const http_server = http.createServer(app);
 
-// Cocec-parser
-import codec_parser from "codec-parser";
-
-// Metadata parser
-import { parseBuffer } from 'music-metadata';
-import { uint8ArrayToBase64 } from 'uint8array-extras';
-
-// Decoder
-import { FLACDecoder } from "@wasm-audio-decoders/flac";
-const decoder = new FLACDecoder();
-
 // Image blob reduce
 import Sharp from "sharp";
 
 // WebSockets
 import WebSocket, { WebSocketServer } from 'ws';
-import { start } from "repl";
 global.wss = new WebSocketServer({ noServer: true });
 
 http_server.on('upgrade', upgrade_websocket);
@@ -109,7 +97,7 @@ wss.on('connection', (ws, req) => {
 
     // Create a stream thingy for them 🥰🥰🥰🥰🥰🥰🥰
     req.session.stream = new Stream();//🥰
-    req.session.stream.load(); //heartwarming🥰
+    req.session.stream.create_encoder(2); // default quality (medium)
 
     req.session.ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
@@ -144,22 +132,6 @@ wss.on('connection', (ws, req) => {
         // Handle connection close
     });
 });
-
-// move to differtent plaves idiot
-// Converts JSON into a Buffer with type, along with JSON data for client
-function prepare_json(type, data) {
-    if (!data)
-        data = {};
-    
-    const stringed = JSON.stringify(data);
-    const buf = Buffer.alloc(4 + stringed.length);
-
-    buf.writeUInt32LE(type);
-    Buffer.from(stringed).copy(buf, 4);
-
-    return buf;
-}
-
 
 
 // Stats
@@ -291,49 +263,23 @@ function create_metadata_json(metadata) {
 }
 
 function create_format_buffer(metadata) {
-    const num_blocks = metadata.num_blocks;
-    const buffer_size = 4 + 4 + 2 + (4 * num_blocks);
+    const num_frames = metadata.num_frames;
+    const buffer_size = 4 + 4 + 2 + (4 * num_frames);
     const buffer = new ArrayBuffer(buffer_size);
     const buffer_view = new DataView(buffer);
-    console.log(`Buffer is ${buffer_size} bytes containing ${num_blocks} blocks.`);
 
     buffer_view.setUint32(0, metadata.sample_rate, true); // SAMPLE RATE
     buffer_view.setFloat32(4, metadata.duration, true); // DURATION
-    buffer_view.setUint16(8, metadata.num_blocks, true); // NUM_BLOCKS
+    buffer_view.setUint16(8, metadata.num_frames, true); // NUM_FRAMES
 
     let offset = 10;
-    for (let i = 0; i < num_blocks; i++) {
-        buffer_view.setFloat32(offset, metadata.block_durations[i], true); // BLOCK DURATIONS
+    for (let i = 0; i < num_frames; i++) {
+        buffer_view.setFloat32(offset, metadata.frame_durations[i], true); // FRAME DURATIONS
         offset += 4;
     }
 
     return Buffer.from(buffer);
 }
-
-
-// Search
-//let search_index;
-//
-//function update_search_index() {
-//    const all_meta = database.get_all_track_meta();
-//    search_index = [];
-//
-//    for (let i = 0; i < all_meta.length; i++) {
-//        const meta = all_meta[i];
-//        let keywords = "";
-//
-//        keywords += `${meta.track} ${meta.track_number} ${meta.album}`;
-//        for (let i = 0; i < meta.artists.length; i++) {
-//            keywords += ` ${meta.artists[i].artist}`;
-//        }
-//
-//        search_index.push({
-//            keywords: keywords,
-//            meta: meta,
-//            track_id: meta.track.id
-//        });
-//    }
-//}
 
 app.post("/search", (req, res) => {
     // type: all, tracks, albums, artists (if none is present all is assumed)
@@ -418,11 +364,8 @@ process.on('SIGTERM', shut_down);
 process.on('SIGINT', shut_down);
 
 function shut_down() {
-    console.log("Stopping!");
-    console.log("Saving stats...")
+    console.log("\nSaving statistics and stopping server.");
 
-    // bro lagre json
     Stats.save();
-
     process.exit(0);
 }

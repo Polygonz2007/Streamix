@@ -25,7 +25,7 @@ CREATE TABLE tracks (
     duration REAL NOT NULL,
     bitrate REAL,
     sample_rate INT NOT NULL,
-    num_blocks INT NOT NULL
+    num_frames INT NOT NULL
 );
 
 CREATE TABLE track_artists ( -- If a track is made by multiple artists (not the same as album_artist) this table tells you who made the song
@@ -34,20 +34,17 @@ CREATE TABLE track_artists ( -- If a track is made by multiple artists (not the 
     artist_id INTEGER NOT NULL REFERENCES artists(id)
 );
 
-CREATE TABLE track_data (
+CREATE TABLE track_frames (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     track_id INTEGER NOT NULL REFERENCES tracks(id),
     format TINYINT NOT NULL,
     duration REAL NOT NULL,
 
-    block_index INT NOT NULL,
-    num_frames INT NOT NULL,
-    block_size INT NOT NULL,
-    block_data BLOB NOT NULL
+    frame_index INT NOT NULL,
+    frame_data BLOB NOT NULL
 );
 
-CREATE INDEX track_data_i1 ON track_data(track_id);
---CREATE INDEX track_data_i2 ON track_data(block_index)
+CREATE INDEX track_frames_i1 ON track_frames(track_id);
 
 -- Search
 CREATE VIRTUAL TABLE search_index USING fts5 (

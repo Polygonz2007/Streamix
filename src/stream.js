@@ -9,15 +9,12 @@
 
 
 // Imports
-import { FLACDecoder } from '@wasm-audio-decoders/flac';
-import { OpusDecoder } from 'opus-decoder';
-
-import { StreamEncoder } from 'flac-bindings';
-import discordjs_opus from '@discordjs/opus';
-const { OpusEncoder } = discordjs_opus;
+import { spawn } from "child_process";
+import { Readable, Writable } from "stream";
 
 import * as database from "./database.js";
 import Stats from "./stats.js";
+import { appendFileSync, createWriteStream, readFileSync, writeFileSync } from "fs";
 
 const Stream = class {
     constructor() {
@@ -29,171 +26,132 @@ const Stream = class {
         // PLAYBACK
         this.format = 1;
         this.track_id = 0;
-        this.block_index = 0;
+        this.frame_index = 0;
+        this.discontinuity = false;
 
-        // OPUS
-        this.buffer_pos = 0;
-        this.buffer = [ // trash for now
-            [], //Float32Array(4096 * 4),
-            [], //Float32Array(4096 * 4)
-        ]; // Decoded samples are shoved in here for encoding
-        
-        this.bitrate = 384; // Kbps
-        this.samplerate = 48_000;
-        this.opus_buf_size = 2880;
+        // FFmpeg
+        this.ffmpeg;
+        this._resolve;
+        this._reject;
     }
 
-    async load() {
-        // Create decoders
-        this.decoders = {};
-        this.decoders.flac = new FLACDecoder();
-        this.decoders.opus = new OpusDecoder();
-
-        // Create encoders
-        this.encoders = {};
-        //this.encoders.flac = new StreamEncoder({
-        //    channels: 2,         // 2 channels (left and right)
-        //    bitsPerSample: 16,   // 16-bit samples
-        //    samplerate: 44100,   // 44,100 Hz sample rate
-        //    compressionLevel: 8, // Mm yes
-        //});
-        this.encoders.opus = new OpusEncoder(48000, 2);
-        this.encoders.opus.setBitrate(8);
-
-        // Wait
-        await this.decoders.flac.ready;
-        await this.decoders.opus.ready;
-
-        // Finished loading
-        this._resolve();
-    }
-
-    async get_next_opus(data) {
-        console.log("OPUSSS LETS GO")
-
-        while (this.buffer[0].length < this.opus_buf_size) {
-            console.log("getting more data")
-            // Get next buffer (pcm) and put in
-            const pcm = await this.get_next_data(true);
-            
-            const len = pcm[0].length;
-            for (let i = 0; i < len; i += 2) {
-                this.buffer[0].push(pcm[0][i]);
-                this.buffer[0].push(pcm[1][i]);
-            }
-        }
-
-        // Splice off the stuff we need
-        const tbencoded = this.buffer.splice(0, this.opus_buf_size);
-
-        // Encode opus
-        const encoded = this.encoders.opus.encode(tbencoded);
-        console.log(encoded)
-        
-        // Construct buffer
-        // 16B REQ ID
-        // 8B FORMAT (3 High, 4 Mid, 5 Low, 6 Trash)
-        // since opus, no number of frames, just 2880 samples each time :D
-
-        // Return
-    }
-
-    async get_next_flac(data, downsample) {
-        // Get data
-        const result = await this.get_next_data(false);
-        let format = data.format;
-
-        // Downsample if quality
-
-        // Create buffer
-        // If we dont have any frames, the song is done
-        if (!result)
-            format = 0; // Answer with format 0. Don't get or send any data
-        
-        const num_frames = result.num_frames || 0;
-        const block_size = result.block_size || 0;
-        const block_data = result.block_data;
-
-        // Create buffer with message type and buffer index and frame data
-        const metadata_size = 4;
-        const total_size = metadata_size + block_size;
-        const buffer = Buffer.alloc(total_size);
-
-        // Write metadata - IIFN
-        buffer.writeUInt16LE(data.req_id, 0);  // Request ID
-        buffer.writeUInt8(format, 2);     // Format (0: no data, 1: MAX Flac, 2: CD flac)
-        buffer.writeUInt8(num_frames, 3); // Number of frames (max 255)
-
-        // Copy data into buffer (frame lengths and data)
-        if (format != 0) {
-            let offset = metadata_size;
-            Buffer.from(block_data).copy(buffer, offset);
-        }
-        
-        // Send to client
-        Stats.log("num_buffers");
-        Stats.log("buffer_get", total_size);
-
-        // Rteurn
-        return buffer;
-    }
-
-    async downsample_flac(pcm) {
-        // do filtering (maybe just ignore)
-
-        // encode
-        let result = [];
-
-    }
-
-    async get_next_data(decode) {
-        //console.log(`Fetching block data for track #${this.track_id} at block id #${this.block_index}`)
+    async get_next_data() {
+        console.log("GET NEXT DATA")
+        //console.log(`Fetching frame data for track #${this.track_id} at frame id #${this.frame_index}`)
 
         // Get data and increment block index
-        const result = database.get_track_data(this.track_id, 0, this.block_index);
-        this.block_index++;
+        const result = database.get_track_frame(this.track_id, 0, this.frame_index);
+        this.frame_index++;
 
-        // If we dont need to decode just return
-        if (!decode)
-            return result;
-    
-        // Decode into samples and return
-        // Return as normal array for now :sob:
-        const data = result.block_data;
+        // Transcode
+        if (this.discontinuity)
+            this.create_encoder(this.format); // Create new so we dont mess up users cache
 
-        // Split data into frames
-        let frames = [];
-        const frame_count = result.num_frames;
-        const metadata_size = frame_count * 2; // 6 bytes of metdata and then 2 * n bytes of lengths
-
-        let offset = metadata_size;
-        for (let i = 0; i < frame_count; i++) {
-            // Get and push frame to array
-            const length = data.readUint16LE(i * 2, true);
-            frames.push(new Uint8Array(data, offset, length));
-            offset += length;
-        }
-
-        const decoded = await this.decoders.flac.decodeFrames(frames);
-
-        return decoded.channelData;
+        const final = this.transcode(result.frame_data).catch(() => { return false });
+        console.log("YAHO WE GOT STUFF")
+        return final;
     }
 
-    set quality(format) {
+    async transcode(data) {
+        console.log("TRANSCODE")
+        const promise = new Promise((res, rej) => {
+            this._resolve = res;
+            this._reject = rej;
+        });
+
+        // Pipe into ffmpeg
+        this.ffmpeg.stdin.write(readFileSync("E:/Media/Albums/Daft Punk/Random Access Memories/05. Instant Crush.flac"));
+        const writestrean = createWriteStream("./something.flac");
+        this.ffmpeg.stdout.pipe(writestrean);
+        //this.ffmpeg.stdin.write(null);
+
+        return promise;
+    }
+
+    async create_encoder(format) {
+        console.log("CREATE ENCODER")
+        // Generate params
+        let params;
+
+        // Set quality params
+        // 1: Flac max
+        // 2: Flac CD
+        // 3: Opus high
+        // 4: Opus mid
+        // 5: Opus low
+        // 6: Opus trash
+
+        const input = "pipe:0"; //"pipe:0";
+        const output = "pipe:1";
+
+        // FLAC MAX
+        if (format == 1)
+            params = ["-f", "flac", "-i", input, "-f", "flac", output]; // Nothing to be done
+
+        // FLAC MAX
+        if (format == 2)
+            params = ["-f", "flac", "-i", input, "-ar", "44100", "-sample_format", "s16", "-f", "flac", output]; // Downsample to 44.1khz, 16 bit
+
+        // OPUS
+        if (format >= 3)
+            params = ["-f", "flac", "-i", input, "-c:a", "libopus", "-b:a", "192k", "-application", "audio", "-frame_duration", "40", "-vbr", "on", "-cutoff", "0", "-f", "opus", output]; // Set bitrate, frame length, type, variable bitrate and fullband
+
+        // OPUS BITRATES
         if (format == 3)
-            this.bitrate = 384;
+            params[7] = "384k"; // 384 kbps
         else if (format == 4)
-            this.bitrate = 192;
+            params[7] = "192k"; // 192 kbps (default)
         else if (format == 5)
-            this.bitrate = 96;
+            params[7] = "96k"; // 96 kbps
         else if (format == 6)
-            this.birate = 8;
-        else
-            console.error("wtf man");
+            params[7] = "8k"; // 8 kbps (maybe replace with like 32k when serious)
+
+        // Pause transcoding and delete old FFmpeg.
+
+
+        // Spawn new FFmpeg with these params and put in client.
+        console.log(params)
+        this.ffmpeg = spawn("ffmpeg", params);
+
+        this.ffmpeg.stdout.on("data", (data) => {
+            console.log("FFMPREG GAVE BIRTH TO SOME DATA 🥵🥵😱");
+            console.log(data)
+            this._resolve(data);
+        });
+
+        this.ffmpeg.stderr.on("data", (data) => {
+            console.log(`FFmpeg error:\n${data}`);
+            //this._reject(data);
+        });
+
+        this.ffmpeg.on("close", (code) => {
+            console.log(`FFmpeg closed with code ${code}.`);
+        });
+
+        // Attach pipes!
+        //this.output_stream = new Readable();
+        //this.input_stream = new Writable();
+        //
+        //this.input_stream.pipe(this.ffmpeg.stdin);
+
+        // Allow transcoding to keep going! (no longer block stuff)
+    }
+
+    set quality(val) {
+        this._quality = val;
+        this.create_encoder(val);
     }
 
     get quality() {
         return this._quality;
+    }
+
+    close() {
+        // Deallocate buffers
+
+
+        // Kill ffmpeg
+
     }
 }
 

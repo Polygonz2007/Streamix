@@ -6,7 +6,7 @@ const Comms = new class {
     constructor() {
         // Websocket info
         this.url = `ws://${window.location.host}`;
-        this.websocket;
+        this.websocket = new WebSocket(this.url);
         this.connected = false;
         this.connecting = false;
 
@@ -27,7 +27,9 @@ const Comms = new class {
         this.on_ws_message = this.on_ws_message.bind(this);
 
         // Connect to Websocket server
-        this.connect_ws();
+        //this.connect_ws();
+        this.websocket.addEventListener("message", this.on_ws_message);
+        this._ready_res();
 
         // Debug
         this.total_transfer = 0;
