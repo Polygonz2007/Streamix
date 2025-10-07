@@ -97,7 +97,7 @@ wss.on('connection', (ws, req) => {
 
     // Create a stream thingy for them 🥰🥰🥰🥰🥰🥰🥰
     req.session.stream = new Stream();//🥰
-    req.session.stream.create_encoder(2); // default quality (medium)
+    req.session.stream.create_encoder(3); // default quality (medium)
 
     req.session.ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 

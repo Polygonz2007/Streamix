@@ -31,41 +31,51 @@ const Stream = class {
 
         // FFmpeg
         this.ffmpeg;
-        this._resolve;
-        this._reject;
+        this.output;
+        this.output_state = false;
     }
 
     async get_next_data() {
         console.log("GET NEXT DATA")
         //console.log(`Fetching frame data for track #${this.track_id} at frame id #${this.frame_index}`)
 
-        // Get data and increment block index
-        const result = database.get_track_frame(this.track_id, 0, this.frame_index);
-        this.frame_index++;
-
         // Transcode
         if (this.discontinuity)
             this.create_encoder(this.format); // Create new so we dont mess up users cache
 
-        const final = this.transcode(result.frame_data).catch(() => { return false });
+        //let i = 0;
+        //while (!this.output_state && i < 100) {
+            // Get data and increment block index
+            const result = database.get_track_frame(this.track_id, 0, this.frame_index);
+            this.frame_index++;
+            await this.transcode(result.frame_data);
+            //i++;
+        //}
+
+        const final = this.output;
         console.log("YAHO WE GOT STUFF")
         return final;
     }
 
     async transcode(data) {
         console.log("TRANSCODE")
-        const promise = new Promise((res, rej) => {
-            this._resolve = res;
-            this._reject = rej;
-        });
+        console.log(`we ${this.output_state ? "SHOULD NOT" : "should"} be doing this!`);
+        //const promise = new Promise((res, rej) => {
+        //    this._resolve = res;
+        //    this._reject = rej;
+        //});
+
+        // Generate shit
+        //const buf = Buffer.alloc(4096 * 2 * 4);
+        //for (let i = 0; i < 4096 * 2; i++) {
+        //    buf.writeFloatLE(1 - Math.random() * 2, i * 4);
+        //}
 
         // Pipe into ffmpeg
-        this.ffmpeg.stdin.write(readFileSync("E:/Media/Albums/Daft Punk/Random Access Memories/05. Instant Crush.flac"));
-        const writestrean = createWriteStream("./something.flac");
-        this.ffmpeg.stdout.pipe(writestrean);
-        //this.ffmpeg.stdin.write(null);
+        this.ffmpeg.stdin.write(data);
+        this.ffmpeg.stdin.write(0);
 
-        return promise;
+        //return promise;
     }
 
     async create_encoder(format) {
@@ -86,25 +96,28 @@ const Stream = class {
 
         // FLAC MAX
         if (format == 1)
-            params = ["-f", "flac", "-i", input, "-f", "flac", output]; // Nothing to be done
+            params = ["-f", "flac", "-rtbufsize", "1", "-ac", "2", "-i", input, "-frame_size", "4096", "-f", "flac", output]; // Nothing to be done (TEST: encode noise as 44100 hz flac)
 
         // FLAC MAX
         if (format == 2)
-            params = ["-f", "flac", "-i", input, "-ar", "44100", "-sample_format", "s16", "-f", "flac", output]; // Downsample to 44.1khz, 16 bit
+            params = ["-f", "flac", "-rtbufsize", "1", "-i", input, "-frame_size", "4096", "-ar", "44100", "-sample_format", "s16", "-f", "flac", output]; // Downsample to 44.1khz, 16 bit
 
         // OPUS
         if (format >= 3)
-            params = ["-f", "flac", "-i", input, "-c:a", "libopus", "-b:a", "192k", "-application", "audio", "-frame_duration", "40", "-vbr", "on", "-cutoff", "0", "-f", "opus", output]; // Set bitrate, frame length, type, variable bitrate and fullband
+            params = ["-f", "flac", "-rtbufsize", "1", "-ac", "2", "-i", input, "-c:a", "libopus",  "-ar", "48000", "-b:a", "192k", "-application", "audio", "-frame_duration", "40", "-vbr", "on", "-cutoff", "0", "-f", "opus", output]; // Set bitrate, frame length, type, variable bitrate and fullband
 
         // OPUS BITRATES
         if (format == 3)
-            params[7] = "384k"; // 384 kbps
+            params[13] = "384k"; // 384 kbps
         else if (format == 4)
-            params[7] = "192k"; // 192 kbps (default)
+            params[13] = "192k"; // 192 kbps (default)
         else if (format == 5)
-            params[7] = "96k"; // 96 kbps
+            params[13] = "96k"; // 96 kbps
         else if (format == 6)
-            params[7] = "8k"; // 8 kbps (maybe replace with like 32k when serious)
+            params[13] = "8k"; // 8 kbps (maybe replace with like 32k when serious)
+
+        // Be quiet!
+        params.push("-loglevel", "error");
 
         // Pause transcoding and delete old FFmpeg.
 
@@ -115,12 +128,13 @@ const Stream = class {
 
         this.ffmpeg.stdout.on("data", (data) => {
             console.log("FFMPREG GAVE BIRTH TO SOME DATA 🥵🥵😱");
-            console.log(data)
-            this._resolve(data);
+            this.output_state = true;
+            this.output = data;
+            //this._resolve(data);
         });
 
         this.ffmpeg.stderr.on("data", (data) => {
-            console.log(`FFmpeg error:\n${data}`);
+            console.log(`Ffmpeg says ${data}`);
             //this._reject(data);
         });
 
@@ -129,6 +143,9 @@ const Stream = class {
         });
 
         // Attach pipes!
+        const writestrean = createWriteStream("./something.opus");
+        this.ffmpeg.stdout.pipe(writestrean);
+
         //this.output_stream = new Readable();
         //this.input_stream = new Writable();
         //
