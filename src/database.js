@@ -119,8 +119,16 @@ export function get_album_image(id) {
 
 // Tracks
 export function create_track(name, number, album_id, path, metadata) {
-    const query = db.prepare("INSERT INTO tracks (name, number, album_id, path, duration, bitrate, sample_rate, num_frames) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    const result = query.run(name, number, album_id, path, metadata.duration, metadata.bitrate, metadata.sample_rate, metadata.num_frames);
+    const query = db.prepare(`
+                            INSERT INTO 
+                                tracks 
+                                (name, number, album_id, path,
+                                format, duration, sample_rate) 
+                            VALUES 
+                                (?, ?, ?, ?,
+                                ?, ?, ?)`);
+
+    const result = query.run(name, number, album_id, path, metadata.format, metadata.duration, metadata.sample_rate);
     if (result.changes == 0)
         return false;
 
@@ -169,28 +177,12 @@ export function get_track_meta(id) {
 export function get_track_format(id) {
     // Get format data
     const query = db.prepare(`SELECT 
-                                tracks.duration, tracks.bitrate,
-                                tracks.sample_rate, tracks.num_frames
+                                tracks.duration, tracks.sample_rate, tracks.format
                             FROM tracks
                             WHERE tracks.id = ?`);
     let result = query.get(id);
     if (!result)
         return false;
-
-    // Construct block data
-    const frame_query = db.prepare(`SELECT duration FROM track_frames WHERE track_frames.track_id = ? ORDER BY track_frames.frame_index ASC`);
-    const frame_result = frame_query.all(id);
-    if (!frame_result)
-        console.log("shi idk");
-
-    const num_frames = frame_result.length;
-    const frames = new Float32Array(num_frames);
-    for (let i = 0; i < num_frames; i++) {
-        frames[i] = frame_result[i].duration;
-    }
-
-    // Add to metadata
-    result.frame_durations = frames;
 
     return result;
 }
@@ -227,18 +219,32 @@ export function get_track_by_path(path) {
 }
 
 // Track data
-export function create_track_frame(track_id, format, index, duration, data) {
-    const query = db.prepare("INSERT INTO track_frames (track_id, format, frame_index, duration, frame_data) VALUES (?, ?, ?, ?, ?)");
-    const result = query.run(track_id, format, index, duration, data);
+export function create_track_frame(track_id, format, index, data) {
+    const query = db.prepare("INSERT INTO track_frames (track_id, format, frame_index, frame_data) VALUES (?, ?, ?, ?)");
+    const result = query.run(track_id, format, index, data);
     if (result.changes == 0)
         return false;
 
     return result.lastInsertRowid;
 }
 
-export function get_track_frame(track_id, format, index) {
-    format = 0;
+export function create_track_frames(track_id, format, frames) {
+    const query = db.prepare("INSERT INTO track_frames (track_id, format, frame_index, frame_data) VALUES (?, ?, ?, ?)");
+    let tot_size = 0;
 
+    const add_frames = db.transaction((frames) => {
+        for (let i = 0; i < frames.length; i++) {
+            query.run(track_id, format, i, frames[i].data);
+            tot_size += frames[i].data.byteLength;
+        }
+    });
+
+    add_frames(frames);
+
+    return tot_size;
+}
+
+export function get_track_frame(track_id, format, index) {
     const query = db.prepare(`SELECT 
                                 frame_data
                             FROM track_frames 

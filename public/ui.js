@@ -16,6 +16,20 @@ const Seekbar = new class {
         this._position = 0;
         this.duration = 1;
         this.bar_length = 0;
+
+        // Seeking
+        this.seeking = false;
+        this.seeking_time = 0;
+
+        // Seeking behaviour
+        this.div.addEventListener("mousedown", () => {
+            this.seeking = true;
+        });
+
+        this.div.addEventListener("mouseup", () => {
+            this.seeking = false;
+            Stream.seek(this.seeking_time);
+        });
     }
 
     get position() {
@@ -78,11 +92,19 @@ const UI = new class {
 
         this.info_loaded = false;
 
+        // Mouse
+        this.mouse_pos = {x: 0, y: 0};
+        document.addEventListener("mousemove", (e) => {
+            this.mouse_pos = { x: e.clientX, y: e.clientY };
+        });
+
         // Elements
         this.controls_div = document.querySelector("#controls");
 
         this.controls = {};
         this.controls.pause = document.querySelector("#pause");
+        this.controls.next = document.querySelector("#next");
+        this.controls.previous = document.querySelector("#previous");
 
         this.seekbar = Seekbar;
 
@@ -176,7 +198,7 @@ const UI = new class {
     clear_info() {
         // Set text
         this.info.title.innerText = "Streamix";
-        this.info.artist.innerHTML = `<span>Quality: </span><a>${Stream.formats[Stream.format]}</a>`;
+        this.info.artist.innerHTML = `<span>Quality: </span><a>${Stream.formats[Stream.req_format]}</a>`;
         this.info.album.innerHTML = `<span>Cache: </span><a>Disabled</a>`;//0.00GB [0% full]</a>`;
 
         // Set album cover
@@ -209,11 +231,31 @@ const UI = new class {
     }
 
     update_seekbar() {
+        // Stop if no longer needed
         if (!this.seekbar.active)
             return;
 
-        const start_time = Queue.playing.start_time; // Replace with getting the one that is displayed.
-        const current_time = Stream.context.currentTime;
+        // Keep it updated
+        if (!Stream.paused)
+            requestAnimationFrame(this.update_seekbar);
+
+        const start_time = Queue.playing.start_time - Queue.playing.seek_offset;
+        let current_time = Stream.context.currentTime;
+
+        // Seeking
+        if (this.seekbar.seeking) {
+            // Update seeking time
+            const { left, right } = this.seekbar.line.getBoundingClientRect();
+            let percent = (this.mouse_pos.x - left) / (right - left);
+
+            if (percent < 0) percent = 0;
+            if (percent > 1) percent = 1;
+
+            this.seekbar.seeking_time = percent * Queue.playing.duration;
+
+            // Move bar to there
+            current_time = this.seekbar.seeking_time;
+        }
 
         const played_time = current_time - start_time;
         const remaining_time = played_time - this.seekbar.duration;
@@ -224,10 +266,6 @@ const UI = new class {
 
         // Set bar
         this.seekbar.position = played_time;
-
-        // Keep it updated
-        if (!Stream.paused)
-            requestAnimationFrame(this.update_seekbar);
     }
 
     clear_seekbar() {
@@ -270,3 +308,36 @@ const UI = new class {
 
 export default UI;
 window.ui = UI;
+
+
+//  INPUT  //
+// Buttons
+UI.controls.pause.addEventListener("click", () => {
+    Stream.pause();
+});
+
+UI.controls.next.addEventListener("click", () => {
+    Stream.next();
+});
+
+UI.controls.previous.addEventListener("click", () => {
+    Stream.previous();
+});
+
+// Keyboard
+document.addEventListener("keyup", (event) => {
+    // Make sure user is not typing.
+    const target = event.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+        return; // User is typing!
+
+    // Pause
+    switch (event.key) {
+        case " ": Stream.pause(); break;
+        case ">": Stream.next(); break;
+        case "<": Stream.previous(); break;
+    }
+        
+})
+
+// Touch (phone)

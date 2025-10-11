@@ -18,43 +18,53 @@ import { appendFileSync, createWriteStream, readFileSync, writeFileSync } from "
 
 const Stream = class {
     constructor() {
-        this.ready = new Promise((resolve, reject) => {
-            this._resolve = resolve;
-            this._reject = reject;
-        });
+        //this.ready = new Promise((resolve, reject) => {
+        //    this._resolve = resolve;
+        //    this._reject = reject;
+        //});
 
         // PLAYBACK
         this.format = 1;
+        this.req_format = 1;
+
         this.track_id = 0;
         this.frame_index = 0;
+        this.flac_frame_mult = Math.floor(process.env.flac_frame_mult) || 4;
+
         this.discontinuity = false;
 
         // FFmpeg
         this.ffmpeg;
         this.output;
         this.output_state = false;
+        this.tot_writ_bytes = 0;
     }
 
     async get_next_data() {
-        console.log("GET NEXT DATA")
-        //console.log(`Fetching frame data for track #${this.track_id} at frame id #${this.frame_index}`)
+        //console.log(`\nFetching frame data\nTrack #${this.track_id}\nFrame ID #${this.frame_index}\nFormat ${this.format}`);
 
         // Transcode
-        if (this.discontinuity)
-            this.create_encoder(this.format); // Create new so we dont mess up users cache
+        //if (this.discontinuity)
+        //    this.create_encoder(this.format); // Create new so we dont mess up users cache
 
-        //let i = 0;
-        //while (!this.output_state && i < 100) {
-            // Get data and increment block index
-            const result = database.get_track_frame(this.track_id, 0, this.frame_index);
+        // Update format
+        if (this.frame_index % 4 == 0 && this.req_format != this.format)
+            this.format = this.req_format;
+
+        // Get next frame and tell em taishi
+        const index = (this.format <= 2) ? Math.floor(this.frame_index / this.flac_frame_mult) : this.frame_index;
+        const result = database.get_track_frame(this.track_id, this.format, index);
+        if (!result)
+            return false;
+
+        // Increment
+        if (this.format <= 2)
+            this.frame_index += this.flac_frame_mult;
+        else
             this.frame_index++;
-            await this.transcode(result.frame_data);
-            //i++;
-        //}
 
-        const final = this.output;
-        console.log("YAHO WE GOT STUFF")
-        return final;
+        Stats.log("buffer_bytes", result.frame_data.length);
+        return result;
     }
 
     async transcode(data) {
@@ -72,8 +82,10 @@ const Stream = class {
         //}
 
         // Pipe into ffmpeg
+        this.tot_writ_bytes += data.byteLength;
+        console.log("WRITTEN " + this.tot_writ_bytes + " FUCKING BYTES")
         this.ffmpeg.stdin.write(data);
-        this.ffmpeg.stdin.write(0);
+        //this.ffmpeg.stdin.write(0);
 
         //return promise;
     }
@@ -96,15 +108,15 @@ const Stream = class {
 
         // FLAC MAX
         if (format == 1)
-            params = ["-f", "flac", "-rtbufsize", "1", "-ac", "2", "-i", input, "-frame_size", "4096", "-f", "flac", output]; // Nothing to be done (TEST: encode noise as 44100 hz flac)
+            params = ["-f", "flac", "-fflags", "+nobuffer", "-probesize", "32", "-max_probe_packets", "1", "-ac", "2", "-i", input, "-frame_size", "4096", "-flags", "+global_header", "-flush_packets", "1", "-f", "flac", output]; // Nothing to be done (TEST: encode noise as 44100 hz flac)
 
         // FLAC MAX
         if (format == 2)
-            params = ["-f", "flac", "-rtbufsize", "1", "-i", input, "-frame_size", "4096", "-ar", "44100", "-sample_format", "s16", "-f", "flac", output]; // Downsample to 44.1khz, 16 bit
+            params = ["-f", "flac", "-rtbufsize", "10k", "-i", input, "-frame_size", "4096", "-ar", "44100", "-sample_format", "s16", "-flush_packets", "1", "-f", "flac", output]; // Downsample to 44.1khz, 16 bit
 
         // OPUS
         if (format >= 3)
-            params = ["-f", "flac", "-rtbufsize", "1", "-ac", "2", "-i", input, "-c:a", "libopus",  "-ar", "48000", "-b:a", "192k", "-application", "audio", "-frame_duration", "40", "-vbr", "on", "-cutoff", "0", "-f", "opus", output]; // Set bitrate, frame length, type, variable bitrate and fullband
+            params = ["-f", "flac", "-max_probe_packets", "1", "-ac", "2", "-i", input, "-c:a", "libopus",  "-ar", "48000", "-b:a", "192k", "-application", "audio", "-frame_duration", "60", "-vbr", "on", "-cutoff", "0", "-flags", "+global_header", "-flush_packets", "1", "-f", "opus", output]; // Set bitrate, frame length, type, variable bitrate and fullband
 
         // OPUS BITRATES
         if (format == 3)
@@ -128,8 +140,10 @@ const Stream = class {
 
         this.ffmpeg.stdout.on("data", (data) => {
             console.log("FFMPREG GAVE BIRTH TO SOME DATA 🥵🥵😱");
+            console.log(data)
             this.output_state = true;
             this.output = data;
+            this.tot_writ_bytes = 0;
             //this._resolve(data);
         });
 
@@ -140,10 +154,9 @@ const Stream = class {
 
         this.ffmpeg.on("close", (code) => {
             console.log(`FFmpeg closed with code ${code}.`);
-        });
-
+        })
         // Attach pipes!
-        const writestrean = createWriteStream("./something.opus");
+        const writestrean = createWriteStream("./something.flac");
         this.ffmpeg.stdout.pipe(writestrean);
 
         //this.output_stream = new Readable();

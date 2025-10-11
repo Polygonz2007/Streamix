@@ -23,16 +23,12 @@ class Track {
 
         // Fetch data
         const track_meta = await Comms.fetch_json(`/track/${this.id}`);
-        const track_format_buffer = await Comms.fetch_buffer(`/track/${this.id}.format`);
 
-        // Decode format
-        const track_format = this.decode_format(track_format_buffer);
-
-        // Store info
-        this.sample_rate = track_format.sample_rate;
-        this.duration = track_format.duration;
-        this.num_frames = track_format.num_frames;
-        this.block_durations = track_format.block_durations;
+        // Store info we have so far
+        this.sample_rate = 0;
+        this.duration = 0;
+        this.seek_offset = 0;
+        this.num_frames = 0;
 
         this.title = track_meta.track.name;
         this.album = track_meta.album;
@@ -41,40 +37,17 @@ class Track {
 
         this._resolve();
         this.loaded = true;
-    }
-
-    decode_format(track_format_buffer) {
-        let result = {};
-        const buffer_view = new DataView(track_format_buffer);
-
-        // Get info
-        result.sample_rate = buffer_view.getUint32(0, true); // SAMPLE RATE
-        result.duration = buffer_view.getFloat32(4, true); // DURATION
-        result.num_frames = buffer_view.getUint16(8, true); // NUM_FRAMES
-        result.block_durations = [];
-
-        // Get all block durations
-        let offset = 10;
-        for (let i = 0; i < result.num_frames; i++) {
-            result.block_durations.push(buffer_view.getFloat32(offset, true)); // BLOCK DURATIONS
-            offset += 4;
-        }
-
-        console.log(`TRACK HAS ${result.sample_rate} SMPLR RATE AND ${result.duration} DURATION AND ${result.num_frames} FRAMES`);
-
-        return result;
+        this.loaded_fmt = false;
     }
 
     get_block_time(frame_index) {
         if (frame_index < 0 || frame_index > this.num_frames)
             return 0;
 
-        let time = 0;
-        for (let i = 0; i < frame_index; i++) {
-            time += this.block_durations[i];
-        }
-
-        return time;
+        if (Stream.format <= 2)
+            return frame_index * ((5760) / this.sample_rate);
+        else
+            return frame_index * ((2880) / this.sample_rate);
     }
 }
 
@@ -113,13 +86,14 @@ export const Queue = new class {
     }
 
     get time_offset() {
-        // Track durations
+        // Track durations and seeking offsets for all previous tracks
         let offset = 0;
         for (let i = 0; i < this.active_index; i++) {
-            offset += this.tracks[i].duration;
+            offset += this.tracks[i].duration - this.tracks[i].seek_offset;
         }
 
-        // Seeking offsets
+        // And seeking offset for this track!
+        offset -= this.current.seek_offset;
 
         return offset;
     }
@@ -130,14 +104,18 @@ export const Queue = new class {
             return false;
 
         // Next track
-        if (this.active_index < 0 || this.current.frame_index > this.current.num_frames)
+        const scaled_frame_index = Stream.format <= 2 ? Math.floor(this.current.frame_index / 2) : this.current.frame_index;
+        if (this.active_index < 0 || scaled_frame_index >= this.current.num_frames)
             this.active_index++;
 
         const current_track = this.current;
         if (!current_track)
             return false;
 
-        current_track.frame_index++;
+        if (current_track.frame_index != -1)
+            current_track.frame_index += Stream.format <= 2 ? 2 : 1; // Increment by 2 if flac.
+        else
+            current_track.frame_index = 0; // Start correct please.
 
         return {
             track_id: current_track.id,
@@ -238,7 +216,8 @@ export const Stream = new class {
         }
 
         // Settings
-        this.format = 1;
+        this.format = 0; // We dont know what format we can use yet
+        this.req_format = 3; // The format we want to use, but may not have switched yet
         this.formats = [
             "No data",
             "Max [Flac]",
@@ -246,7 +225,7 @@ export const Stream = new class {
             "High [Opus, 384 kbps]",
             "Medium [Opus, 192 kbps]",
             "Low [Opus, 96 kbps]",
-            "Trash [Opus, 8 kbps]"
+            "Trash [Opus, 24 kbps]"
         ]
 
         // Debug
@@ -256,6 +235,7 @@ export const Stream = new class {
         this.active = false; // If false, no song is up next and therefore nothing can play
         this.paused = true; // If playback is occuring
         this.buffering = false; // Wait until headroom is topped before playback.
+        this.seeking = false;
         
         this.volume = 1;
         this.buffer_time = 0;
@@ -264,7 +244,7 @@ export const Stream = new class {
         this.track_id;
 
         // Global playback data
-        this.desired_headroom = 96; // How many buffers to load in advance
+        this.desired_headroom = 192; // How many buffers to load in advance
         this._headroom = 0; // How many buffers are loaded after the current one
 
         this.sources = [];
@@ -273,13 +253,13 @@ export const Stream = new class {
 
     async load_decoders() {
         // get
-        const { FLACDecoderWebWorker, FLACDecoder } = window["flac-decoder"];
-        const { OpusDecoder } = window["opus-decoder"];
+        const { FLACDecoder, FLACDecoderWebWorker } = window["flac-decoder"];
+        const { OpusDecoder, OpusDecoderWebWorker } = window["opus-decoder"];
 
         // create
         this.decoders = {};
-        this.decoders.flac = new FLACDecoder();
-        this.decoders.opus = new OpusDecoder();
+        this.decoders.flac = new FLACDecoderWebWorker(); //new FLACDecoder();
+        this.decoders.opus = new OpusDecoderWebWorker(); //new OpusDecoder();
 
         // load
         await this.decoders.flac.ready;
@@ -290,11 +270,14 @@ export const Stream = new class {
     }
 
     async play(track_id) {
+        console.log(`Adding #${track_id} to queue`);
         await Queue.add_track(track_id);
 
         // Do nothing if stuff is playing, else start playing
         if (this.active)
             return;
+
+        console.log(`Playing #${track_id} immediatley`);
 
         this.active = true;
         this.buffering = true;
@@ -326,6 +309,80 @@ export const Stream = new class {
         return this._paused;
     }
 
+    async seek(time) {
+        const track = Queue.current;
+        if (!track)
+            return; // Nothing to seek
+
+        // Check if time is within tracks length
+        if (time < 0)
+            time = 0;
+
+        if (time >= track.duration)
+            time = track.duration;
+
+        // Calculate frame index (floored)
+        const frame_index = Math.floor(time / ((this.format <= 2 ? 5760 : 2880) / track.sample_rate));
+
+        // Ask server very nicley
+        const result = await Comms.ws_req({
+            type: 4, // Seek
+            frame_index: frame_index
+        });
+
+        // Check if we are allowed
+        const buffer_view = new DataView(result);
+        const seek_result = buffer_view.getUint16(2, true);
+
+        if (!seek_result)
+            return;  // Womp, maybe try again
+
+        // We can. Pause, update, and buffer.
+        this.paused = true;
+        this.seeking = true;
+
+        // Get frame_index before seek
+        const current_time = this.context.currentTime - Queue.time_offset;
+        const prev_frame_index = Math.floor(current_time / ((this.format <= 2 ? 5760 : 2880) / track.sample_rate));
+        const diff = frame_index - prev_frame_index;
+        const seek_duration = diff * ((this.format <= 2 ? 5760 : 2880) / track.sample_rate); // Difference multiplied by duration of each frame
+
+        console.log(`DIFF ${diff}\nSEEKDUR ${seek_duration}s\n\nPREV ${prev_frame_index} NEW ${frame_index}`);
+
+        // Yes, now update frame index and seek offset and headroom
+        track.frame_index = frame_index;
+        track.seek_offset += seek_duration;
+        
+        this.flush(); // Get rid of all old buffers
+        this.buffering = true; // Wait until we can play agaiun
+        this.seeking = false;
+        this.headroom = 0; // Restart process of getting buffers
+    }
+
+    goto(track_index) {
+        if (track_index < 0) return;
+        if (track_index >= Queue.tracks.length) return;
+
+        this.paused = true;
+        this.seeking = true;
+
+        Queue.active_index = track_index;
+        Queue.current.frame_index = 0;
+
+        this.flush(); // Get rid of all old buffers
+        this.buffering = true; // Wait until we can play agaiun
+        this.seeking = false;
+        this.headroom = 0; // Restart process of getting buffers
+    }
+
+    next() {
+        this.goto(Queue.playing_index + 1);
+    }
+
+    previous() {
+        this.goto(Queue.playing_index - 1);
+    }
+
     get played_time() {
         const start_time = Queue.playing.start_time; // Replace with getting the one that is displayed.
         const current_time = Stream.context.currentTime;
@@ -334,6 +391,9 @@ export const Stream = new class {
     }
 
     set headroom(num) {
+        if (num < 0)
+            return;
+
         this._headroom = num;
         this.check_headroom();
     }
@@ -355,8 +415,6 @@ export const Stream = new class {
     }
 
     check_headroom() {
-        console.log("chekcing headroom")
-
         if (this.headroom < this.desired_headroom)
             this.get_next_buffer();
     }
@@ -399,39 +457,72 @@ export const Stream = new class {
     }
 
     async get_next_buffer() {
-        console.log("get")
-
-        // Figure out what the next buffer is. (check track block quantity, and then queue)
+        // Figure out what the next buffer is.
         const { track_id, track_index, frame_index } = Queue.next();
         if (!track_id)
             return; // No more to be played!
 
         const track = Queue.tracks[track_index];
+        const scaled_frame_index = Stream.format <= 2 ? Math.floor(frame_index / 2) : frame_index;
 
         // Switch track
-        if (frame_index == 0) {
-            await Comms.ws_req({
-                type: 0,
+        if (scaled_frame_index == 0) {
+            const fmt = await Comms.ws_req({
+                type: 1,
                 track_id: track.id
             });
+
+            if (!track.loaded_fmt) { // Set format stuff for the track
+                const buffer_view = new DataView(fmt);
+
+                track.max_sample_rate = buffer_view.getUint32(2, true); // MAX SAMPLE RATE
+                track.duration = buffer_view.getFloat32(6, true); // DURATION
+            }
+
+            console.log(`Changed track to #${track.id}`);
         }
 
-        console.log("changed track")
+        // See if we need to change format
+        if ((frame_index % 2 == 0 && this.format != this.req_format) || frame_index == 0) { // Start of track, or on format change
+            // Check if it can happen
+            const format_change = await Comms.ws_req({
+                type: 2,
+                format: this.req_format
+            });
+
+            // Get the format we requested, or highest possible
+            const buffer_view = new DataView(format_change);
+            const legal_format = buffer_view.getUint8(2);
+
+            // Update it
+            this.req_format = legal_format;
+            this.format = legal_format;
+
+            // Update samplereate
+            if (this.format == 1)
+                track.sample_rate = track.max_sample_rate;
+            else if (this.format == 2)
+                track.sample_rate = 44100;
+            else if (this.format >= 3)
+                track.sample_rate = 48000;
+
+            // Update number of frames
+            track.num_frames = Math.ceil(track.duration / ((this.format <= 2 ? 5760 : 2880) / track.sample_rate));
+            console.log(`Track\nSAMPLE RATE ${track.sample_rate}\nFORMAT ${this.format}\nN_FRAMES ${track.num_frames}`);
+        }
 
         const start = performance.now(); // Timing
         
         // Request it (get from cache or server)
         const data = await Comms.ws_req({
-            type: 1, // get buffer
-            format: 1 // opus high idk // Flac MAX
+            type: 0, // get buffer
+            format: this.format // of the correct format
         });
 
         const transfer = performance.now(); // Timing
 
-        console.log("now todecing")
-
         // Decode
-        const decoded = await this.decode_data(data);
+        const decoded = await this.decode_data(data, this.format);
         if (decoded.error) {
             console.log("deocde error")
             console.error(decoded.error)
@@ -439,41 +530,40 @@ export const Stream = new class {
         }
 
         const decode = performance.now(); // Timing
-        console.log("decoded")
 
         // Create source and set to start
-        console.log(decoded)
-        const source = await this.create_source(decoded.channelData, decoded.samplesDecoded, decoded.sampleRate);
-        const start_time = Queue.time_offset + Queue.current.get_block_time(frame_index);
+        const source = await this.create_source(decoded.channelData, decoded.samplesDecoded, track.sample_rate);
+        const start_time = Queue.time_offset + track.get_block_time(scaled_frame_index);
         source.start(start_time);
 
         // info
         if (this.debug) {
-            document.querySelector("#debug-info").innerHTML += `<p id="bi${frame_index}">
-                                                                    Block #${frame_index}<br>
-                                                                    Start: ${start_time.toFixed(2)}s
+            document.querySelector("#debug-info").innerHTML += `<p id="bi${scaled_frame_index}">
+                                                                    Preparing frame #${scaled_frame_index} on track #${track.id}<br>
+                                                                    Format: ${this.formats[this.format]}<br>
+                                                                    Start time: ${start_time.toFixed(2)}s
                                                                 </p>`;
         }
 
         // Update headroom
         this.headroom++;
         const index = this.sources.push(source);
-        console.log("ready")
 
         // Check buffering
-        if (this.buffering && this.headroom == this.desired_headroom) {
+        if (this.buffering && this.headroom >= this.desired_headroom) {
+            console.log("DONE BUFFERING")
             this.buffering = false;
             this.paused = false;
         }
 
         // Tell track when it started
-        if (frame_index == 0)
+        if (scaled_frame_index == 0)
             Queue.tracks[track_index].start_time = start_time;
 
         // Started
         this.attach_time_event(start_time, () => {
             // When track starts
-            if (frame_index == 0) {
+            if (scaled_frame_index == 0) {
                 // Set playing index
                 Queue.playing_index = track_index;
 
@@ -488,6 +578,10 @@ export const Stream = new class {
 
         // Ended
         source.addEventListener("ended", () => {
+            // Do not cause chaos if we are seeking
+            if (this.seeking)
+                return;
+
             this.headroom--;
 
             // Pause when out of buffers
@@ -495,8 +589,8 @@ export const Stream = new class {
                 this.paused = true;
 
                 // Set inactive when queue done
-                console.log(`Num tracks ${Queue.tracks.length} this track indexs ${track_index}\nFrame index ${frame_index} num frames ${track.num_frames}`);
-                if (Queue.tracks.length - 1 == track_index && frame_index == track.num_frames - 1) {
+                console.log(`Num tracks ${Queue.tracks.length} this track indexs ${track_index}\nFrame index ${scaled_frame_index} num frames ${track.num_frames}`);
+                if (Queue.tracks.length - 1 == track_index && scaled_frame_index == track.num_frames - 1) {
                     this.active = false;
                     UI.clear_info();
                     UI.clear_seekbar();
@@ -506,41 +600,28 @@ export const Stream = new class {
                 }
             }
 
-            // Remove shit
-            this.sources.splice(index);
-            delete source.buffer;
-            
+            // Remove shit (the newest one because we dont know hat order they are in?!?!?)
+            //this.sources.splice(0);
         });
     }
 
-    async decode_data(data) {
-        //const data_view = new DataView(data);
-//
-        //const format = data_view.getUint8(2); // IIFN
-        //if (format == 0) // NO DATA
-        //    return {error: "No data present in this buffer."};
-        //
-        //// Split data into frames
-        //let frames = [];
-        //const frame_count = data_view.getUint8(3);
-        //const metadata_size = 4 + frame_count * 2; // 6 bytes of metdata and then 2 * n bytes of lengths
-//
-        //let offset = metadata_size;
-        //for (let i = 0; i < frame_count; i++) {
-        //    // Get and push frame to array
-        //    const length = data_view.getUint16(4 + i * 2, true);
-        //    frames.push(new Uint8Array(data, offset, length));
-        //    offset += length;
-        //}
+    async decode_data(data, format) {
         const frame = new Uint8Array(data, 2);
 
         // Decode data
-        if (!this.decoders.flac.ready)
-            return;
+        if (format <= 2) {
+            // FLAC
+            if (!this.decoders.flac.ready)
+                return;
 
-        const decoded = await this.decoders.flac.decodeFrames(frame);
+            return await this.decoders.flac.decodeFrames([frame]); // Does not have decodeFrame for some reason..
+        } else if (format <= 6) {
+            // OPUS
+            if (!this.decoders.opus.ready)
+                return;
 
-        return decoded;
+            return await this.decoders.opus.decodeFrames([frame]);
+        }
     }
 
     async create_source(data, num_samples, sample_rate) {
@@ -563,10 +644,14 @@ export const Stream = new class {
     }
 
     flush() { // Stop all buffers
-        for (let i = 0; i < this.sources; i++) {
+        console.log(`flushing away ${this.sources.length} sources`)
+        for (let i = 0; i < this.sources.length; i++) {
             const source = this.sources[i];
-            source.stop(0);
-            delete source.buffer;
+            //source.playbackRate.value = 10000; // hogogogo
+
+            source.stop();
+            source.disconnect();
+            //delete this.sources[i];
         }
 
         this.sources = [];
@@ -578,21 +663,13 @@ await Stream.load_decoders();
 
 export default Stream;
 window.stream = Stream;
+window.queue = Queue;
 
 
 // Clear UI
 UI.clear_info();
 
-// Attach events
-document.querySelector("#pause").addEventListener("click", () => {
-    Stream.pause();
-});
-
-document.addEventListener("keyup", (event) => {
-    if (event.key == " ")
-        Stream.pause();
-})
-
+// temp
 document.getElementById("lastfm-copy").addEventListener("click", () => {
    // Get the text field
   const copyText = document.getElementById("lastfm");

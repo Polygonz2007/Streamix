@@ -23,9 +23,8 @@ CREATE TABLE tracks (
     path varchar(255) NOT NULL,
 
     duration REAL NOT NULL,
-    bitrate REAL,
     sample_rate INT NOT NULL,
-    num_frames INT NOT NULL
+    format TINYINT NOT NULL -- Highest format this track has. For example, 44.1khz 16 bit track has format 2
 );
 
 CREATE TABLE track_artists ( -- If a track is made by multiple artists (not the same as album_artist) this table tells you who made the song
@@ -38,13 +37,13 @@ CREATE TABLE track_frames (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     track_id INTEGER NOT NULL REFERENCES tracks(id),
     format TINYINT NOT NULL,
-    duration REAL NOT NULL,
 
     frame_index INT NOT NULL,
     frame_data BLOB NOT NULL
 );
 
 CREATE INDEX track_frames_i1 ON track_frames(track_id);
+CREATE INDEX track_frames_i2 ON track_frames(frame_index);
 
 -- Search
 CREATE VIRTUAL TABLE search_index USING fts5 (

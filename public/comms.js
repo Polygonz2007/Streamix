@@ -158,8 +158,6 @@ const Comms = new class {
         const req_id = data_view.getUint16(0, true);
         let req, req_pos;
 
-        console.log(`we got ${req_id} back?`)
-
         // Find our beloved request
         for (let i = 0; i < this.reqs.length; i++) {
             if (this.reqs[i].req_id == req_id) {
@@ -191,7 +189,6 @@ const Comms = new class {
         this.prev_transfer_time = performance.now();
 
         // Do it
-        console.log(`bro ${req_id} came back to us `);
         req.resolve(data);
 
         // Remove request because it succeded

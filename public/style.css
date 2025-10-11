@@ -40,6 +40,7 @@
     background-color: #0006;
     opacity: 0;
     object-fit: scale-down;
+    pointer-events: none; /* Allow us to access album cover underneath */
 
     transition: opacity 200ms;
 }
@@ -51,7 +52,7 @@ h1 {
 
     color: var(--color-strong);
 
-    margin: 1.1rem 0;
+    margin: 1.4rem 0;
     padding: 0;
 }
 
@@ -61,7 +62,7 @@ h2 {
     text-shadow: #000B 0 0 3rem;
     text-wrap: balance;
 
-    margin: 0.9rem 0;
+    margin: 1.1rem 0;
     padding: 0;
 }
 
@@ -255,6 +256,7 @@ input.image:active {
     font-weight: 600;
 
     transition: transform 0.5s;
+    opacity: var(--inactive-opacity);
 }
 
 #library:hover {
@@ -329,6 +331,7 @@ input.image:active {
     color: #A00;
     font-weight: 400;
 }
+
 
 
 

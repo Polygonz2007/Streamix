@@ -26,6 +26,7 @@
     --background-image-effect: contrast(110%) brightness(75%) saturate(120%);
     --background-image-blur: max(5vw, 5vh);
     --glow: drop-shadow(#FFFA 0 0 0.8rem);
+    --inactive-opacity: 100%;
 
 
     /* Calculated values */

@@ -36,8 +36,12 @@ const Stats = new class {
     }
 
     async save() {
-        const data = JSON.stringify(this.stats);
+        const data = JSON.stringify(this.stats, null, 2);
         writeFileSync(stats_path, data);
+    }
+
+    get_json() {
+        return JSON.stringify(this.stats);
     }
 }
 

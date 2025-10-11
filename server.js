@@ -95,11 +95,12 @@ function upgrade_websocket(request, socket, head) {
 
 wss.on('connection', (ws, req) => {
 
-    // Create a stream thingy for them 🥰🥰🥰🥰🥰🥰🥰
-    req.session.stream = new Stream();//🥰
-    req.session.stream.create_encoder(3); // default quality (medium)
+    // Create a stream thingy for them
+    req.session.stream = new Stream();
+    //req.session.stream.create_encoder(1); // default quality (medium)    NO REAL TIME TRANSCODING FOR NOW
 
     req.session.ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
 
     ws.on('message', async (data, isBinary) => {
         const start_time = performance.now();
@@ -110,21 +111,24 @@ wss.on('connection', (ws, req) => {
 
         // Get important stuff
         const client = req.session;
-        const req_id = data.req_id;
         const type = data.type;
 
         // Switch case
         let result;
         switch (type) {
-            case 0: result = await wsi.set_track(client, data); break;
-            case 1: result = await wsi.next_buffer(client, data); break;
+            case 0: result = await wsi.next_buffer(client, data); break;
+
+            case 1: result = await wsi.set_track(client, data); break;
+            case 2: result = await wsi.set_format(client, data); break;
+
             case 4: result = await wsi.seek_to(client, data); break;
             case 8: result = await wsi.log_played(client, data); break;
         }
 
         const end_time = performance.now();
-        console.log(`${(end_time - start_time).toFixed(2)}ms => Req #${req_id} from ${req.session.ip} of type ${type}`);
+        //console.log(`${(end_time - start_time).toFixed(2)}ms => Req #${req_id} from ${req.session.ip} of type ${type}`);
 
+        Stats.log("ws_req");
         ws.send(result);
     });
 
@@ -145,7 +149,7 @@ app.get("/stats", (req, res) => {
     return res.send(`
         <h1>horrible stats page</h1>
         <p>Server has started up ${Stats.stats.startups} times...!</p>
-        <p>A total of ${Math.round(Stats.stats.buffer_get / 1_000_00) / 10} MB has been transferred over ${Stats.stats.num_buffers} buffers.</p>
+        <p>A total of ${(Stats.stats.buffer_bytes / 1_000_000).toFixed(2)} MB has been transferred over ${Stats.stats.ws_req} buffers.</p>
         <p>HTTP requests: ${Stats.stats.http_get}!!!</p>
     `);
 });
@@ -213,22 +217,12 @@ app.get("/track/:track_id", (req, res) => {
     if (!track_id)
         return res.sendStatus(400); // Give us an id idiot.
 
-    // Create correct thing
-    if (req.params.track_id.endsWith(".format")) {
-        // FORMAT
-        const format_data = database.get_track_format(track_id);
-        if (!format_data)
-            return res.sendStatus(404); // Track does not exist
+    // META
+    const metadata = database.get_track_meta(track_id);
+    if (!metadata)
+        return res.sendStatus(404); // Track does not exist
 
-        return res.send(create_format_buffer(format_data));
-    } else {
-        // META
-        const metadata = database.get_track_meta(track_id);
-        if (!metadata)
-            return res.sendStatus(404); // Track does not exist
-
-        return res.send(create_metadata_json(metadata));
-    } 
+    return res.send(create_metadata_json(metadata));
 });
 
 function create_metadata_json(metadata) {
@@ -262,25 +256,6 @@ function create_metadata_json(metadata) {
     return data;
 }
 
-function create_format_buffer(metadata) {
-    const num_frames = metadata.num_frames;
-    const buffer_size = 4 + 4 + 2 + (4 * num_frames);
-    const buffer = new ArrayBuffer(buffer_size);
-    const buffer_view = new DataView(buffer);
-
-    buffer_view.setUint32(0, metadata.sample_rate, true); // SAMPLE RATE
-    buffer_view.setFloat32(4, metadata.duration, true); // DURATION
-    buffer_view.setUint16(8, metadata.num_frames, true); // NUM_FRAMES
-
-    let offset = 10;
-    for (let i = 0; i < num_frames; i++) {
-        buffer_view.setFloat32(offset, metadata.frame_durations[i], true); // FRAME DURATIONS
-        offset += 4;
-    }
-
-    return Buffer.from(buffer);
-}
-
 app.post("/search", (req, res) => {
     // type: all, tracks, albums, artists (if none is present all is assumed)
     // string: what to search for
@@ -291,8 +266,6 @@ app.post("/search", (req, res) => {
     // Foe now only tracks!
 
     // Updates
-    const start_time = performance.now();
-
     const data = req.body;
     let string = data.string;
     if (!string)
@@ -325,9 +298,6 @@ app.post("/search", (req, res) => {
     for (let i = 0; i < tracks.length; i++) {
         results.push(create_metadata_json(tracks[i]));
     }
-
-    const end_time = performance.now();
-    console.log(`Search for "${string}" took ${Math.ceil(end_time - start_time)}ms to complete.`);
 
     return res.send(results);
 
