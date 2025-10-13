@@ -432,7 +432,8 @@ export const Stream = new class {
             const event_buf = this.events.slice(0); // So we dont mess up the REAL array when removing shit
             const current_time = this.context.currentTime;
 
-            for (let i = 0; i < event_buf.length; i++) {
+            const event_num = event_buf.length;
+            for (let i = 0; i < event_num; i++) {
                 const event = event_buf[i];
                 if (current_time < event.time)
                     continue; // Not now!
@@ -647,11 +648,8 @@ export const Stream = new class {
         console.log(`flushing away ${this.sources.length} sources`)
         for (let i = 0; i < this.sources.length; i++) {
             const source = this.sources[i];
-            //source.playbackRate.value = 10000; // hogogogo
-
             source.stop();
             source.disconnect();
-            //delete this.sources[i];
         }
 
         this.sources = [];

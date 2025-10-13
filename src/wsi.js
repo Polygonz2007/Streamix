@@ -23,6 +23,9 @@ export async function set_track(client, data) {
     client.stream.track_id = data.track_id;
     client.stream.frame_index = 0;
 
+    // We need new cache!
+    client.stream.cache = [];
+
     // Respond with nesecarry metadata.
     const buffer_size = 2 + 4 + 4;
     const buffer = new ArrayBuffer(buffer_size);
@@ -74,6 +77,7 @@ export async function next_buffer(client, data) {
 export async function seek_to(client, data) {
     // Be dumb for now...
     client.stream.frame_index = data.frame_index;
+    client.stream.cache = []; // We need new cache!
     console.log(`Jumped to frame index ${client.stream.frame_index}`);
 
     return response(data.req_id, 1);

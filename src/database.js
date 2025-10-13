@@ -259,6 +259,24 @@ export function get_track_frame(track_id, format, index) {
     return result;
 }
 
+export function get_track_frames(track_id, format, start_index, count) {
+    const query = db.prepare(`SELECT 
+                                frame_data
+                            FROM track_frames 
+                            WHERE 
+                                track_frames.track_id = ? 
+                                AND track_frames.format = ? 
+                                AND track_frames.frame_index < ?
+                            ORDER BY track_frames.frame_index DESC
+                            LIMIT ?`);
+    const result = query.all(track_id, format, start_index + count, count);
+    if (!result)
+        return false;
+
+    console.log("Read new buffers.");
+    return result;
+}
+
 // Search
 export function create_search_entry(track_id, track, album, artists) {
     // Clean
