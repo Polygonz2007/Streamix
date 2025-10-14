@@ -135,8 +135,8 @@ const Background = new class {
 
     update_dims() {
         this.screen = {
-            width: window.innerWidth / this.downsample,
-            height: window.innerHeight / this.downsample
+            width: window.innerWidth / this.downsample * window.devicePixelRatio,
+            height: window.innerHeight / this.downsample * window.devicePixelRatio
         };
 
         this.canvas.width = this.screen.width;

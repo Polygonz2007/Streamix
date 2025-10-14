@@ -266,14 +266,13 @@ export function get_track_frames(track_id, format, start_index, count) {
                             WHERE 
                                 track_frames.track_id = ? 
                                 AND track_frames.format = ? 
-                                AND track_frames.frame_index < ?
-                            ORDER BY track_frames.frame_index DESC
+                                AND track_frames.frame_index >= ?
+                            ORDER BY track_frames.id ASC
                             LIMIT ?`);
-    const result = query.all(track_id, format, start_index + count, count);
+    const result = query.all(track_id, format, start_index, count); // ORDER BY track_frames.frame_index ASC      ORDER BY track_frames.id ASC  
     if (!result)
         return false;
 
-    console.log("Read new buffers.");
     return result;
 }
 

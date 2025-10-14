@@ -35,7 +35,8 @@ const Stream = class {
 
         // Caching
         this.cache = [];
-        this.cache_size = 256;
+        this.cache_size = 384;
+        this.cache_index = 0;
 
         // FFmpeg
         this.ffmpeg;
@@ -47,8 +48,6 @@ const Stream = class {
     async get_next_data() {
         //console.log(`\nFetching frame data\nTrack #${this.track_id}\nFrame ID #${this.frame_index}\nFormat ${this.format}`);
 
-        const start = performance.now();
-
         // Transcode
         //if (this.discontinuity)
         //    this.create_encoder(this.format); // Create new so we dont mess up users cache
@@ -59,27 +58,33 @@ const Stream = class {
             this.cache = []; // We need new cache!
         }
 
-        // Fill up cache if empty
-        if (this.cache.length <= 0) {
+        // Next buffer, fill up cache if empty
+        this.cache_index++;
+
+        if (this.cache_index >= this.cache_size || this.cache.length == 0) { //this.cache.length <= 0) {
+            const start = performance.now();
             const index = (this.format <= 2) ? Math.floor(this.frame_index / this.flac_frame_mult) : this.frame_index;
             const result = database.get_track_frames(this.track_id, this.format, index, this.cache_size);
             if (!result)
                 return false;
 
             this.cache = result;
+            this.cache_index = 0;
+
+            const end = performance.now();
+            console.log(`Cache updated in ${(end - start).toFixed(3)}ms`);
         }
 
         // Get next buffer and tellem taishi
-        const buffer = this.cache.pop();
+        const buffer = this.cache[this.cache_index]; //.pop();
+        if (!buffer)
+            return false;
 
         // Increment
         if (this.format <= 2)
             this.frame_index += this.flac_frame_mult;
         else
             this.frame_index++;
-
-        const end = performance.now();
-        console.log(`Buffer prepared in ${(end - start).toFixed(4)}ms`);
 
         Stats.log("buffer_bytes", buffer.frame_data.length);
         return buffer;

@@ -229,7 +229,7 @@ export const Stream = new class {
         ]
 
         // Debug
-        this.debug = true;
+        this.debug = false;
 
         // Playback
         this.active = false; // If false, no song is up next and therefore nothing can play
@@ -244,7 +244,8 @@ export const Stream = new class {
         this.track_id;
 
         // Global playback data
-        this.desired_headroom = 192; // How many buffers to load in advance
+        // TODO: calculate headroom based of seconds of buffer. default = 15s
+        this.desired_headroom = 128; // How many buffers to load in advance
         this._headroom = 0; // How many buffers are loaded after the current one
 
         this.sources = [];
@@ -516,8 +517,7 @@ export const Stream = new class {
         
         // Request it (get from cache or server)
         const data = await Comms.ws_req({
-            type: 0, // get buffer
-            format: this.format // of the correct format
+            type: 0 // get buffer
         });
 
         const transfer = performance.now(); // Timing
@@ -591,7 +591,7 @@ export const Stream = new class {
 
                 // Set inactive when queue done
                 console.log(`Num tracks ${Queue.tracks.length} this track indexs ${track_index}\nFrame index ${scaled_frame_index} num frames ${track.num_frames}`);
-                if (Queue.tracks.length - 1 == track_index && scaled_frame_index == track.num_frames - 1) {
+                if (Queue.tracks.length - 1 == track_index && scaled_frame_index >= track.num_frames - 1) {
                     this.active = false;
                     UI.clear_info();
                     UI.clear_seekbar();
