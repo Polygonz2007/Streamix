@@ -5,9 +5,9 @@
 /**  INFO  **/
 #info {
     position: fixed;
-    top: calc(50% - 2.5rem); left: 50%;
+    top: calc(50% - 4rem); left: 50%;
     transform: translate(-50%, -50%);
-    width: calc(var(--album-cover-size) * 1.3333);
+    width: min(calc(var(--album-cover-size) * 2), 100vw);
 
     z-index: 2;
     text-align: center;

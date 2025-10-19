@@ -6,7 +6,7 @@ const Comms = new class {
     constructor() {
         // Websocket info
         this.url = `ws://${window.location.host}`;
-        this.websocket = new WebSocket(this.url);
+        this.websocket;
         this.connected = false;
         this.connecting = false;
 
@@ -26,11 +26,6 @@ const Comms = new class {
         // Bind functions
         this.on_ws_message = this.on_ws_message.bind(this);
 
-        // Connect to Websocket server
-        //this.connect_ws();
-        this.websocket.addEventListener("message", this.on_ws_message);
-        this._ready_res();
-
         // Debug
         this.total_transfer = 0;
         this.transfer_rate = 0;
@@ -38,7 +33,15 @@ const Comms = new class {
         this.prev_transfer_time = this.transfer_time;
     }
 
-    async connect_ws() {
+    async ws_connect() {
+        this.websocket = new WebSocket(this.url);
+
+        // Connect to Websocket server
+        this.websocket.addEventListener("message", this.on_ws_message);
+        this._ready_res();
+
+        return;
+
         this.connecting = true;
         this.reconnect_time = this.reconnect_time_init;
 
@@ -218,7 +221,7 @@ const Comms = new class {
 
 
 // Enable caching of fetch requests
-Comms.register_sw();
+//Comms.register_sw();
 
 // Export
 export default Comms;

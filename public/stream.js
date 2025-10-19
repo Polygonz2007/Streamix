@@ -2,6 +2,11 @@
 import Comms from "/comms.js";
 import UI    from "/ui.js";
 
+// temporary
+const opus_frame_size = 960;
+const flac_frame_mult = 4;
+const flac_frame_size = opus_frame_size * flac_frame_mult;
+
 class Track {
     constructor(id) {
         this.ready = new Promise((resolve, reject) => {
@@ -45,9 +50,9 @@ class Track {
             return 0;
 
         if (Stream.format <= 2)
-            return frame_index * ((5760) / this.sample_rate);
+            return frame_index * (flac_frame_size / this.sample_rate);
         else
-            return frame_index * ((2880) / this.sample_rate);
+            return frame_index * (opus_frame_size / this.sample_rate);
     }
 }
 
@@ -104,7 +109,7 @@ export const Queue = new class {
             return false;
 
         // Next track
-        const scaled_frame_index = Stream.format <= 2 ? Math.floor(this.current.frame_index / 2) : this.current.frame_index;
+        const scaled_frame_index = Stream.format <= 2 ? Math.floor(this.current.frame_index / flac_frame_mult) : this.current.frame_index;
         if (this.active_index < 0 || scaled_frame_index >= this.current.num_frames)
             this.active_index++;
 
@@ -113,7 +118,7 @@ export const Queue = new class {
             return false;
 
         if (current_track.frame_index != -1)
-            current_track.frame_index += Stream.format <= 2 ? 2 : 1; // Increment by 2 if flac.
+            current_track.frame_index += Stream.format <= 2 ? flac_frame_mult : 1; // Increment by 2 if flac.
         else
             current_track.frame_index = 0; // Start correct please.
 
@@ -217,9 +222,9 @@ export const Stream = new class {
 
         // Settings
         this.format = 0; // We dont know what format we can use yet
-        this.req_format = 3; // The format we want to use, but may not have switched yet
+        this.req_format = 1; // The format we want to use, but may not have switched yet
         this.formats = [
-            "No data",
+            "None",
             "Max [Flac]",
             "CD [Flac]",
             "High [Opus, 384 kbps]",
@@ -323,7 +328,7 @@ export const Stream = new class {
             time = track.duration;
 
         // Calculate frame index (floored)
-        const frame_index = Math.floor(time / ((this.format <= 2 ? 5760 : 2880) / track.sample_rate));
+        const frame_index = Math.floor(time / ((this.format <= 2 ? flac_frame_size : opus_frame_size) / track.sample_rate));
 
         // Ask server very nicley
         const result = await Comms.ws_req({
@@ -344,9 +349,9 @@ export const Stream = new class {
 
         // Get frame_index before seek
         const current_time = this.context.currentTime - Queue.time_offset;
-        const prev_frame_index = Math.floor(current_time / ((this.format <= 2 ? 5760 : 2880) / track.sample_rate));
+        const prev_frame_index = Math.floor(current_time / ((this.format <= 2 ? flac_frame_size : opus_frame_size) / track.sample_rate));
         const diff = frame_index - prev_frame_index;
-        const seek_duration = diff * ((this.format <= 2 ? 5760 : 2880) / track.sample_rate); // Difference multiplied by duration of each frame
+        const seek_duration = diff * ((this.format <= 2 ? flac_frame_size : opus_frame_size) / track.sample_rate); // Difference multiplied by duration of each frame
 
         console.log(`DIFF ${diff}\nSEEKDUR ${seek_duration}s\n\nPREV ${prev_frame_index} NEW ${frame_index}`);
 
@@ -368,12 +373,13 @@ export const Stream = new class {
         this.seeking = true;
 
         Queue.active_index = track_index;
-        Queue.current.frame_index = 0;
+        Queue.current.frame_index = -1;
 
-        this.flush(); // Get rid of all old buffers
-        this.buffering = true; // Wait until we can play agaiun
-        this.seeking = false;
-        this.headroom = 0; // Restart process of getting buffers
+        this.seek(0);
+        //this.flush(); // Get rid of all old buffers
+        //this.buffering = true; // Wait until we can play agaiun
+        //this.seeking = false;
+        //this.headroom = 0; // Restart process of getting buffers
     }
 
     next() {
@@ -465,7 +471,7 @@ export const Stream = new class {
             return; // No more to be played!
 
         const track = Queue.tracks[track_index];
-        const scaled_frame_index = Stream.format <= 2 ? Math.floor(frame_index / 2) : frame_index;
+        const scaled_frame_index = Stream.format <= 2 ? Math.floor(frame_index / flac_frame_mult) : frame_index;
 
         // Switch track
         if (scaled_frame_index == 0) {
@@ -485,7 +491,7 @@ export const Stream = new class {
         }
 
         // See if we need to change format
-        if ((frame_index % 2 == 0 && this.format != this.req_format) || frame_index == 0) { // Start of track, or on format change
+        if ((frame_index % flac_frame_mult == 0 && this.format != this.req_format) || frame_index == 0) { // Start of track, or on format change
             // Check if it can happen
             const format_change = await Comms.ws_req({
                 type: 2,
@@ -509,7 +515,7 @@ export const Stream = new class {
                 track.sample_rate = 48000;
 
             // Update number of frames
-            track.num_frames = Math.ceil(track.duration / ((this.format <= 2 ? 5760 : 2880) / track.sample_rate));
+            track.num_frames = Math.ceil(track.duration / ((this.format <= 2 ? flac_frame_size : opus_frame_size) / track.sample_rate));
             console.log(`Track\nSAMPLE RATE ${track.sample_rate}\nFORMAT ${this.format}\nN_FRAMES ${track.num_frames}`);
         }
 
@@ -535,6 +541,7 @@ export const Stream = new class {
         // Create source and set to start
         const source = await this.create_source(decoded.channelData, decoded.samplesDecoded, track.sample_rate);
         const start_time = Queue.time_offset + track.get_block_time(scaled_frame_index);
+        console.log(start_time)
         source.start(start_time);
 
         // info
@@ -657,6 +664,7 @@ export const Stream = new class {
 }
 
 // Load decoders
+await Comms.ws_connect();
 await Stream.load_decoders();
 
 export default Stream;

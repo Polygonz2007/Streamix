@@ -20,6 +20,7 @@ const Stats = new class {
 
         let data = readFileSync(stats_path);
         data = JSON.parse(data);
+
         this.stats = data;
     }
 

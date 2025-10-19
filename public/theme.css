@@ -3,7 +3,7 @@
 :root { /**  SETTINGS  **/
     /* Colors */
     --color-background: #111;
-    --color-background-glass: #000A;
+    --color-background-glass: #0008;
     --color-foreground: #FFF;
     --color-foreground-glass: #FFF8;
 
@@ -101,7 +101,7 @@
 
 /** Global **/
 body {
-    background-color: #000;
+    background-color: var(--color-background);
     color: var(--color-normal);
 
     font-family: "Nebula Sans";

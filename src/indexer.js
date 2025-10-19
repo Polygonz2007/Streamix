@@ -1,12 +1,23 @@
 // Find all music and puts it in the database. Also updates database when files change.
 
 import * as fs from "fs/promises";
-import { existsSync } from "fs";
+import { existsSync, read } from "fs";
 import path from "path";
 import { parseFile as parse_metadata } from 'music-metadata';
 import * as database from "./database.js";
 import codec_parser, { duration } from "codec-parser";
 import { spawn } from "child_process";
+import { Readable } from "stream";
+
+const formats = [
+    "None",
+    "Max [Flac]",
+    "CD [Flac]",
+    "High [Opus, 384 kbps]",
+    "Medium [Opus, 192 kbps]",
+    "Low [Opus, 96 kbps]",
+    "Trash [Opus, 24 kbps]"
+]
 
 const Indexer = new class {
     //constructor(auto_update) {
@@ -125,9 +136,9 @@ const Indexer = new class {
         };
     }
 
-    async transcode(file_path, format) {
+    async transcode(data, format) {
         let params;
-        const input = file_path;
+        const input = "pipe:0";
         let output = "pipe:1";
 
         const opus_frame_size = process.env.opus_frame_size || 20;
@@ -182,6 +193,11 @@ const Indexer = new class {
             resolve(); 
         });
 
+        const inputStream = new Readable();
+        inputStream.push(data);
+        inputStream.push(null); // Signal end of stream
+        inputStream.pipe(ffproc.stdin);
+
         // Wait for transcoding to finish
         await promise;
 
@@ -201,13 +217,11 @@ const Indexer = new class {
         return arrbuf;
     }
 
-    async index_data(file, id, format) {
-        const file_path = path.join(file.parentPath, file.name);
-
+    async index_data(data, id, format) {
         // Get and parse audio data
         const mimetype = `audio/${(format < 3) ? "flac" : "ogg"}`; // audio/flac, audio/ogg (opus)
         const parser = new codec_parser(mimetype);
-        const file_data = await this.transcode(file_path, format);
+        const file_data = await this.transcode(data, format);
         let frames = parser.parseAll(file_data);
         if (format >= 3) {
             // Get all OpusFrame-s from the OggPage-s
@@ -252,6 +266,11 @@ const Indexer = new class {
         const files = (await fs.readdir(directory, { withFileTypes: true, recursive: true }))
                         .filter(dirent => dirent.isFile() && dirent.name.endsWith(".flac"));
 
+        const num_files = files.length;
+        process.stdout.write(`\Scanning ${num_files} files for indexing...\n`);
+
+        let num_files_added = 0;
+
         for (let i = 0; i < files.length; i++) {
             const time_start = performance.now();
             
@@ -267,24 +286,36 @@ const Indexer = new class {
             if (!meta_status)
                 continue;
 
+            process.stdout.clearLine(0); process.stdout.cursorTo(0);
+            process.stdout.write(`${(((i / num_files) * 100).toFixed(1))}% | Indexing track #${meta_status.track_id} ["${meta_status.track_name}"]`);
+
+            // Read file data
+            const data = await fs.readFile(file_path);
+
             // Transcode to quality levels we need
             let promises = [];
             for (let format = meta_status.format; format <= 6; format++) {
                 promises.push(new Promise(async (res, rej) => {
-                    await this.index_data(file, meta_status.track_id, format);
+                    await this.index_data(data, meta_status.track_id, format);
                     res();
                 }));
             }
 
             // Transcode all formats at once
-            console.log(`Transcoding "${file_path}" to formats ${meta_status.format} to 6.`);
             await Promise.all(promises);
 
             const time_end = performance.now();
-            console.log(`Indexed track #${meta_status.track_id} ["${meta_status.track_name}"]}\nTook ${Math.floor(time_end - time_start)}ms to complete.\n`);
+            process.stdout.clearLine(); process.stdout.cursorTo(0);
+            process.stdout.write(`${Math.floor(time_end - time_start)}ms => Indexed track #${meta_status.track_id} ["${meta_status.track_name}"]\n`);
+            num_files_added++;
         }
         
         console.log(`\nTracks for "${directory}" indexed.`);
+        if (num_files_added == 0)
+            console.log("Database is up to date!");
+        else
+            console.log(`Successfully indexed ${num_files_added} new tracks.`);
+
         return true;
     }
 

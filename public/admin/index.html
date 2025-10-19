@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streamix - Statistics</title>
+
+    <!-- Global CSS -->
+    <link rel="stylesheet" href="/theme.css">
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <h1>Stream Statistics</h1>
+
+    <h2>Data transferred:</h2>
+    <h3 id="buffer_bytes"></h3>
+    <canvas id="buffer_bytes_graph"></canvas>
+
+    <h2>Buffers sent</h2>
+    <h3 id="ws_req"></h3>
+
+    <h2>Clients connected</h2>
+    <h3 id="clients"></h3>
+</body>
+
+<script type="module" src="./script.js"></script>
+</html>

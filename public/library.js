@@ -43,7 +43,7 @@ const Library = new class {
             const info = document.createElement("div");
 
             const title = document.createElement("p");
-            title.innerText = track_data.track.name;
+            title.innerText = `[#${track_data.track.number}] ${track_data.track.name}`;
             title.classList.add("title");
 
             const artist = document.createElement("p");

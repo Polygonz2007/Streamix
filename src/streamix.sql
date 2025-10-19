@@ -43,7 +43,7 @@ CREATE TABLE track_frames (
 );
 
 CREATE INDEX track_frames_i1 ON track_frames(track_id);
-CREATE INDEX track_frames_i2 ON track_frames(format);
+CREATE INDEX track_frames_i2 ON track_frames(frame_index);
 
 -- Search
 CREATE VIRTUAL TABLE search_index USING fts5 (

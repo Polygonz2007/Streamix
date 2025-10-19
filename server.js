@@ -97,6 +97,7 @@ wss.on('connection', (ws, req) => {
 
     // Create a stream thingy for them
     req.session.stream = new Stream();
+    Stats.log("clients");
     //req.session.stream.create_encoder(1); // default quality (medium)    NO REAL TIME TRANSCODING FOR NOW
 
     req.session.ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -134,24 +135,22 @@ wss.on('connection', (ws, req) => {
 
     ws.on('close', () => {
         // Handle connection close
+        Stats.log("clients", -1);
     });
 });
 
 
 // Stats
 app.get("*", (req, res, next) => {
-    Stats.log("http_get");
+    if (req.url !== "/data/stats")
+        Stats.log("http_get");
+
     return next();
 });
 
 // Routes
-app.get("/stats", (req, res) => {
-    return res.send(`
-        <h1>horrible stats page</h1>
-        <p>Server has started up ${Stats.stats.startups} times...!</p>
-        <p>A total of ${(Stats.stats.buffer_bytes / 1_000_000).toFixed(2)} MB has been transferred over ${Stats.stats.ws_req} buffers.</p>
-        <p>HTTP requests: ${Stats.stats.http_get}!!!</p>
-    `);
+app.get("/data/stats", (req, res) => {
+    return res.send(Stats.get_json());
 });
 
 
@@ -256,6 +255,7 @@ function create_metadata_json(metadata) {
     return data;
 }
 
+// Searching
 app.post("/search", (req, res) => {
     // type: all, tracks, albums, artists (if none is present all is assumed)
     // string: what to search for
@@ -336,6 +336,7 @@ process.on('SIGINT', shut_down);
 function shut_down() {
     console.log("\nSaving statistics and stopping server.");
 
+    Stats.stats.clients = 0;
     Stats.save();
     process.exit(0);
 }
