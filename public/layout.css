@@ -3,6 +3,8 @@
     --album-cover-size: min(min(82vw, 52vh), var(--album-cover-size-max));
 
     --controls-width: 52rem;
+
+    --settings-sidebar-width: 16rem;
 }
 
 /* Phone */

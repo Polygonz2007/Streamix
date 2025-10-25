@@ -120,11 +120,15 @@ const Background = new class {
 
         // Get context
         this.canvas = canvas;
+        this.temp_canvas = document.createElement("canvas");
 
         // Get screen size and set canvas size
+        this.screen = { width: 0, height: 0 };
+        this.prev_screen = this.screen;
         this.update_dims();
 
         this.context = this.canvas.getContext("2d");
+        this.temp_context = this.temp_canvas.getContext("2d");
 
         this._src = "";
 
@@ -134,6 +138,11 @@ const Background = new class {
     }
 
     update_dims() {
+        this.prev_screen = {
+            width: this.screen.width,
+            height: this.screen.height // JAVASCRIPT DEEP COPY AHHH
+        };
+
         this.screen = {
             width: window.innerWidth / this.downsample * window.devicePixelRatio,
             height: window.innerHeight / this.downsample * window.devicePixelRatio
@@ -141,6 +150,9 @@ const Background = new class {
 
         this.canvas.width = this.screen.width;
         this.canvas.height = this.screen.height;
+
+        this.temp_canvas.width = this.screen.width;
+        this.temp_canvas.height = this.screen.height;
     }
 
     get src() {
@@ -209,7 +221,7 @@ const Background = new class {
         }
 
         // Convolve
-        const convolver = new Convolver(this.context, kernel, kernel);
+        const convolver = new Convolver(this.temp_context, kernel, kernel);
         convolver.convolve();
         
         return true;
@@ -217,7 +229,7 @@ const Background = new class {
 
     // Changes the brightness of the image.
     brightness_and_contrast(brightness, contrast) {
-        const image_data = this.context.getImageData(0, 0, this.screen.width, this.screen.height);
+        const image_data = this.temp_context.getImageData(0, 0, this.screen.width, this.screen.height);
         const offset = 255 * (1 - contrast) / 2;
 
         // Brightness
@@ -228,14 +240,14 @@ const Background = new class {
             image_data.data[i+3] = image_data.data[i+3];
         }
 
-        this.context.putImageData(image_data, 0, 0); 
+        this.temp_context.putImageData(image_data, 0, 0); 
         return true;
     }
 
     // Puts the result onto the canvas object.
     async render() {
-        this.update_dims();
-
+        Background.update_dims();
+        
         // Load image onto temp_buffer and fade to it
         // BUT FIRST just load the fucking image
         let img = new Image();
@@ -259,8 +271,8 @@ const Background = new class {
         }
 
         // Draw the image but flipped
-        this.context.scale(-1, 1);
-        this.context.drawImage(img, start_x, start_y, size_x, size_y, 0, 0, -this.screen.width, this.screen.height);
+        this.temp_context.scale(-1, 1);
+        this.temp_context.drawImage(img, start_x, start_y, size_x, size_y, 0, 0, -this.screen.width, this.screen.height);
 
         // Blur
         const blur_percent = 0.035;
@@ -268,12 +280,49 @@ const Background = new class {
 
         // Brightness and contrast
         this.brightness_and_contrast(0.6, 0.95);
+
+        this.fade_in_update(100);
     }
 
     clear() {
         this.update_dims();
-        this.context.fillStyle = "#000";
-        this.context.fillRect(0, 0, this.screen.width, this.screen.height);
+        this.temp_context.fillStyle = "#000";
+        this.temp_context.fillRect(0, 0, this.screen.width, this.screen.height);
+    }
+
+    fade_in_update(duration) {
+        if (!duration)
+            duration = 100;
+        
+        const old_ctx = document.createElement("canvas").getContext("2d");
+        old_ctx.width = this.screen.width;
+        old_ctx.height = this.screen.height;
+        old_ctx.drawImage(this.canvas, 0, 0);
+
+        const new_ctx = document.createElement("canvas").getContext("2d");
+        new_ctx.width = this.screen.width;
+        new_ctx.height = this.screen.height;
+        new_ctx.drawImage(this.temp_canvas, 0, 0);
+
+        let frame_index = 0;
+        
+        function frame() {
+            frame_index++;
+            if (frame_index > duration)
+                return;
+
+            this.context.globalAlpha = (duration - frame_index) / duration
+            this.context.drawImage(old_ctx.canvas, 0, 0);
+            this.context.globalAlpha = frame_index / duration
+            this.context.drawImage(new_ctx.canvas, 0, 0);
+            this.context.globalAlpha = 1;
+
+            //this.context.drawImage(this.temp_canvas, 0, 0);
+            requestAnimationFrame(frame);
+        }
+
+        frame = frame.bind(this);
+        frame();
     }
 }
 
@@ -281,5 +330,10 @@ export default Background;
 Background.clear();
 
 window.addEventListener("resize", () => {
-    Background.render();
+    //console.log("ipdate")
+    //Background.update_dims();
+    //Background.context.drawImage(Background.temp_canvas, 0, 0);
+//
+    //if (Background.screen.width == Background.prev_screen.width && Background.screen.height == Background.prev_screen.height) // if nesecarry, re render (wait a few frames i guess)
+        Background.render(); //console.log("render")
 });

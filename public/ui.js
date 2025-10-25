@@ -3,6 +3,8 @@
 import Background from "/background.js";
 import { Stream, Queue } from "/stream.js";
 
+const body = document.querySelector("body");
+
 const Seekbar = new class {
     constructor() {
         this.time_played = document.querySelector("#time-played");
@@ -24,11 +26,18 @@ const Seekbar = new class {
         // Seeking behaviour
         this.div.addEventListener("mousedown", () => {
             this.seeking = true;
+            body.style.cursor = "grab";
+            this.div.style.cursor = "grab";
         });
 
-        this.div.addEventListener("mouseup", () => {
+        body.addEventListener("mouseup", () => {
+            if (!this.seeking)
+                return;
+
             this.seeking = false;
             Stream.seek(this.seeking_time);
+            body.style.cursor = "";
+            this.div.style.cursor = "pointer";
         });
     }
 
@@ -80,6 +89,36 @@ const Seekbar = new class {
     }
 }
 
+const Settings = new class {
+    constructor() {
+        //this.settings = {
+        //    "Playback": {
+        //        "Audio Quality": {
+        //            type: "select",
+        //            choices: ["Max", "CD", "High", "Mid", "Low", "Trash"],
+        //            callback: Stream.set_req_format
+        //        }
+        //    }
+        //}
+
+        this.container = document.querySelector("#settings-container");
+        this.menu = document.querySelector("#settings-menu");
+        this.btn = document.querySelector("#settings");
+
+        this.open = false;
+
+        this.btn.addEventListener("click", () => {
+            this.open = true;
+            this.container.style.visibility = "visible";
+        });
+
+        this.container.addEventListener("click", () => {
+            this.open = false;
+            this.container.style.visibility = "hidden";
+        });
+    }
+}
+
 const UI = new class {
     constructor() {
         // Settings
@@ -99,6 +138,8 @@ const UI = new class {
         });
 
         // Elements
+
+        // Controls
         this.controls_div = document.querySelector("#controls");
 
         this.controls = {};
@@ -117,6 +158,8 @@ const UI = new class {
         this.info.cover = document.querySelector("#album-cover");
         this.info.loading = document.querySelector("#loading");
         this.info.background = document.querySelector("#background");
+
+        this.settings = Settings;
 
         // Request animation frame binding so it works
         this.update_seekbar = this.update_seekbar.bind(this);
@@ -239,7 +282,7 @@ const UI = new class {
         if (!Stream.paused)
             requestAnimationFrame(this.update_seekbar);
 
-        const start_time = Queue.playing.start_time - Queue.playing.seek_offset;
+        let start_time = Queue.playing.start_time - Queue.playing.seek_offset;
         let current_time = Stream.context.currentTime;
 
         // Seeking
@@ -254,6 +297,7 @@ const UI = new class {
             this.seekbar.seeking_time = percent * Queue.playing.duration;
 
             // Move bar to there
+            start_time = Queue.playing.start_time;
             current_time = this.seekbar.seeking_time;
         }
 
@@ -304,6 +348,7 @@ const UI = new class {
         return `${prefix}${m}:${s}`;
     }
 
+    
 }
 
 export default UI;

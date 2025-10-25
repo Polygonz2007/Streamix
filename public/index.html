@@ -27,7 +27,7 @@
         <input type="text" placeholder="Last.fm command" id="lastfm">
         <input type="button" value="Copy" id="lastfm-copy">
 
-        <!--<p id="debug-info">Blocks</p>-->
+        <p id="debug-info">Blocks</p>
 
         <canvas id="background"></canvas>
 
@@ -63,11 +63,11 @@
             </div>
 
             <div id="control-buttons">
-                <!--<input type="button" class="image" id="settings" />-->
+                <input type="button" class="image" id="settings" />
                 <input type="button" class="image" id="previous" />
                 <input type="button" class="image" id="pause" />
                 <input type="button" class="image" id="next" />
-                <!--<input type="button" class="image" id="volume" />-->
+                <input type="button" class="image" id="volume" style="visibility: hidden;" />
             </div>
         </div>
 
@@ -75,6 +75,23 @@
             <input type="search" placeholder="Search here" id="search">
             <div id="body">
                 
+            </div>
+        </div>
+
+        <div id="settings-container">
+            <div id="settings-menu">
+                <div id="sidebar">
+                    <h1>Settings</h1>
+                </div>
+                <div id="content">
+                    <label>Audio Qualityt</label> <br>
+                    <input type="button" value="Max [Flac]" onclick="window.stream.req_format = 1" />
+                    <input type="button" value="CD [Flac]" onclick="window.stream.req_format = 2" />
+                    <input type="button" value="High [Opus, 384kbps]" onclick="window.stream.req_format = 3" />
+                    <input type="button" value="Mid [Opus, 192kbps]" onclick="window.stream.req_format = 4" />
+                    <input type="button" value="Low [Opus, 96kbps]" onclick="window.stream.req_format = 5" />
+                    <input type="button" value="Trash [Opus, 24kbps]" onclick="window.stream.req_format = 6" />
+                </div>
             </div>
         </div>
         

@@ -2,6 +2,10 @@
 
 import Utils from "/util.js";
 
+// temp
+const debug_info = document.querySelector("#debug-info");
+
+
 const Comms = new class {
     constructor() {
         // Websocket info
@@ -173,21 +177,17 @@ const Comms = new class {
             return false;
 
         // Log size and update debug info
-        //console.log(this.total_transfer)
-        //this.total_transfer += data.byteLength;
-        //const mb = this.total_transfer / 1_000_000;
-//
-        //let delta = performance.now() - this.prev_transfer_time; // ms
-        //if (delta < 1)
-        //    delta = 1;
-//
-        //delta /= 1000;
-//
-        //this.transfer_rate = this.transfer_rate * 0.5 + (data.byteLength / delta) * 0.5; // lerp, and keep track of seconds
-        //
-        //const debug_info = document.querySelector("#debug-info");
-        //if (debug_info)
-        //    debug_info.innerHTML = `Transfer total: ${mb.toFixed(1)} mb<br>Transfer rate:  ${(this.transfer_rate / (1000 / 8)).toFixed(1)} kbps`;
+        this.total_transfer += data.byteLength;
+        const mb = this.total_transfer / 1_000_000;
+
+        let delta = performance.now() - this.prev_transfer_time; // ms
+        if (delta < 1)
+            delta = 1;
+
+        delta /= 1000;
+
+        this.transfer_rate = this.transfer_rate * 0.5 + (data.byteLength / delta) * 0.5; // lerp, and keep track of seconds
+        debug_info.innerHTML = `Transfer total: ${mb.toFixed(1)} mb<br>Transfer rate:  ${(this.transfer_rate / (1000 / 8)).toFixed(1)} kbps`;
 
         this.prev_transfer_time = performance.now();
 

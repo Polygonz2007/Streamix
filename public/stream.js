@@ -49,8 +49,9 @@ class Track {
         if (frame_index < 0 || frame_index > this.num_frames)
             return 0;
 
-        if (Stream.format <= 2)
+        if (Stream.format <= 2) {
             return frame_index * (flac_frame_size / this.sample_rate);
+        }
         else
             return frame_index * (opus_frame_size / this.sample_rate);
     }
@@ -61,6 +62,8 @@ export const Queue = new class {
         this.tracks = [];
         this._active_index = -1; // Index
         this.playing_index = -1;
+
+        this.global_offset = 0;
     }
 
     async add_track(track_id) {
@@ -92,7 +95,7 @@ export const Queue = new class {
 
     get time_offset() {
         // Track durations and seeking offsets for all previous tracks
-        let offset = 0;
+        let offset = this.global_offset;
         for (let i = 0; i < this.active_index; i++) {
             offset += this.tracks[i].duration - this.tracks[i].seek_offset;
         }
@@ -221,6 +224,8 @@ export const Stream = new class {
         }
 
         // Settings
+        this.webworkers = false;
+
         this.format = 0; // We dont know what format we can use yet
         this.req_format = 1; // The format we want to use, but may not have switched yet
         this.formats = [
@@ -250,7 +255,7 @@ export const Stream = new class {
 
         // Global playback data
         // TODO: calculate headroom based of seconds of buffer. default = 15s
-        this.desired_headroom = 128; // How many buffers to load in advance
+        this.desired_headroom = 32; // How many buffers to load in advance
         this._headroom = 0; // How many buffers are loaded after the current one
 
         this.sources = [];
@@ -264,8 +269,13 @@ export const Stream = new class {
 
         // create
         this.decoders = {};
-        this.decoders.flac = new FLACDecoderWebWorker(); //new FLACDecoder();
-        this.decoders.opus = new OpusDecoderWebWorker(); //new OpusDecoder();
+        if (this.webworkers) {
+            this.decoders.flac = new FLACDecoderWebWorker();
+            this.decoders.opus = new OpusDecoderWebWorker();
+        } else {
+            this.decoders.flac = new FLACDecoder();
+            this.decoders.opus = new OpusDecoder();
+        }
 
         // load
         await this.decoders.flac.ready;
@@ -328,7 +338,7 @@ export const Stream = new class {
             time = track.duration;
 
         // Calculate frame index (floored)
-        const frame_index = Math.floor(time / ((this.format <= 2 ? flac_frame_size : opus_frame_size) / track.sample_rate));
+        const frame_index = Math.floor(time / (opus_frame_size / track.sample_rate));
 
         // Ask server very nicley
         const result = await Comms.ws_req({
@@ -349,9 +359,9 @@ export const Stream = new class {
 
         // Get frame_index before seek
         const current_time = this.context.currentTime - Queue.time_offset;
-        const prev_frame_index = Math.floor(current_time / ((this.format <= 2 ? flac_frame_size : opus_frame_size) / track.sample_rate));
+        const prev_frame_index = Math.floor(current_time / (opus_frame_size / track.sample_rate));
         const diff = frame_index - prev_frame_index;
-        const seek_duration = diff * ((this.format <= 2 ? flac_frame_size : opus_frame_size) / track.sample_rate); // Difference multiplied by duration of each frame
+        const seek_duration = diff * (opus_frame_size / track.sample_rate); // Difference multiplied by duration of each frame
 
         console.log(`DIFF ${diff}\nSEEKDUR ${seek_duration}s\n\nPREV ${prev_frame_index} NEW ${frame_index}`);
 
@@ -368,18 +378,35 @@ export const Stream = new class {
     goto(track_index) {
         if (track_index < 0) return;
         if (track_index >= Queue.tracks.length) return;
+        if (track_index == Queue.active_index) return;
 
         this.paused = true;
         this.seeking = true;
 
+        // Update previous tracks seek duration
+        const prev = Queue.current;
+        const prev_index = Queue.active_index;
+        if (Queue.active_index < track_index)
+            Queue.global_offset -= prev.duration - (this.context.currentTime - prev.start_time);
+
+        // Set new track to start
         Queue.active_index = track_index;
         Queue.current.frame_index = -1;
+        Queue.current.start_time = this.context.currentTime;
 
-        this.seek(0);
-        //this.flush(); // Get rid of all old buffers
-        //this.buffering = true; // Wait until we can play agaiun
-        //this.seeking = false;
-        //this.headroom = 0; // Restart process of getting buffers
+        // Add offset to this new track
+        const track = Queue.current;
+        if (track_index < prev_index) {
+            Queue.global_offset += prev.start_time - this.context.currentTime + track.duration;
+        }
+
+        //this.seek(0);
+        this.flush(); // Get rid of all old buffers
+        this.buffering = true; // Wait until we can play agaiun
+        this.seeking = false;
+        this.headroom = 0; // Restart process of getting buffers
+
+        console.log(`CHANGED TRACK TO ${track_index}`)
     }
 
     next() {
@@ -485,6 +512,7 @@ export const Stream = new class {
 
                 track.max_sample_rate = buffer_view.getUint32(2, true); // MAX SAMPLE RATE
                 track.duration = buffer_view.getFloat32(6, true); // DURATION
+                track.loaded_fmt = true;
             }
 
             console.log(`Changed track to #${track.id}`);
@@ -540,8 +568,8 @@ export const Stream = new class {
 
         // Create source and set to start
         const source = await this.create_source(decoded.channelData, decoded.samplesDecoded, track.sample_rate);
-        const start_time = Queue.time_offset + track.get_block_time(scaled_frame_index);
-        console.log(start_time)
+        let start_time = Queue.time_offset + track.get_block_time(scaled_frame_index);
+        console.log(`${Queue.time_offset.toFixed(2)} + ${track.get_block_time(scaled_frame_index).toFixed(2)} = ${start_time.toFixed(2)}`);
         source.start(start_time);
 
         // info
@@ -597,6 +625,7 @@ export const Stream = new class {
                 this.paused = true;
 
                 // Set inactive when queue done
+                console.log(`WE HAVE NO HEADROOM and we are numbee ${scaled_frame_index}`)
                 console.log(`Num tracks ${Queue.tracks.length} this track indexs ${track_index}\nFrame index ${scaled_frame_index} num frames ${track.num_frames}`);
                 if (Queue.tracks.length - 1 == track_index && scaled_frame_index >= track.num_frames - 1) {
                     this.active = false;
