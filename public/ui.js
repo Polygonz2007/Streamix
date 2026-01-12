@@ -2,6 +2,7 @@
 
 import Background from "/background.js";
 import { Stream, Queue } from "/stream.js";
+import Utils from "/util.js";
 
 const body = document.querySelector("body");
 
@@ -53,7 +54,7 @@ const Seekbar = new class {
         const length = Math.round(frac * this.bar_length);
 
         // Update dot
-        this.dot.style.left = `${length}px`;
+        this.dot.style.transform = `translate(calc(${length}px - 50%), -50%)`;
 
         // Update gradient
         const gradient = `linear-gradient(to right, 
@@ -160,6 +161,10 @@ const UI = new class {
         this.info.background = document.querySelector("#background");
 
         this.settings = Settings;
+
+        // Vis
+        const fft_length = 32;
+        this.fft_data = new Float32Array(fft_length);
 
         // Request animation frame binding so it works
         this.update_seekbar = this.update_seekbar.bind(this);
@@ -310,6 +315,13 @@ const UI = new class {
 
         // Set bar
         this.seekbar.position = played_time;
+
+        // Vis
+        Stream.analyser.getFloatFrequencyData(this.fft_data);
+        let strength = Utils.clamp(this.fft_data[0] + 30, 0, 25) / 25;
+        strength = Math.pow(strength, 2.2) * 32;
+        //body.style.transform = `translate(${Math.round((0.5 - Math.random()) * strength)}px, ${Math.round((0.5 - Math.random()) * strength)}px)`;
+        //document.querySelector("#background").style.filter = `brightness(${100 + strength * 4}%)`;
     }
 
     clear_seekbar() {

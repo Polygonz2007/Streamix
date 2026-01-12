@@ -1,6 +1,6 @@
 
 // SETTINGS
-const update_rate = 1;
+const update_rate = 0.5;
 
 // IMPORTS
 import Utils from "/util.js";

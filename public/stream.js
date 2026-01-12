@@ -253,9 +253,14 @@ export const Stream = new class {
 
         this.track_id;
 
+        // Visualization
+        this.analyser = this.context.createAnalyser();
+        this.analyser.fftSize = 32;
+        this.analyser.smoothingTimeConstant = 0.94;
+
         // Global playback data
         // TODO: calculate headroom based of seconds of buffer. default = 15s
-        this.desired_headroom = 32; // How many buffers to load in advance
+        this.desired_headroom = 8; // How many buffers to load in advance
         this._headroom = 0; // How many buffers are loaded after the current one
 
         this.sources = [];
@@ -519,7 +524,9 @@ export const Stream = new class {
         }
 
         // See if we need to change format
-        if ((frame_index % flac_frame_mult == 0 && this.format != this.req_format) || frame_index == 0) { // Start of track, or on format change
+        const can_change_format = frame_index % flac_frame_mult == 0;
+        if ((can_change_format && this.format != this.req_format) || frame_index == 0) { // Start of track, or on format change
+            console.log("CHANMING NOW")
             // Check if it can happen
             const format_change = await Comms.ws_req({
                 type: 2,
@@ -569,7 +576,6 @@ export const Stream = new class {
         // Create source and set to start
         const source = await this.create_source(decoded.channelData, decoded.samplesDecoded, track.sample_rate);
         let start_time = Queue.time_offset + track.get_block_time(scaled_frame_index);
-        console.log(`${Queue.time_offset.toFixed(2)} + ${track.get_block_time(scaled_frame_index).toFixed(2)} = ${start_time.toFixed(2)}`);
         source.start(start_time);
 
         // info
@@ -676,6 +682,7 @@ export const Stream = new class {
         const source = this.context.createBufferSource();
         source.buffer = buffer;
         source.connect(this.context.destination);
+        source.connect(this.analyser); // Vizaulizatn
 
         return source;
     }

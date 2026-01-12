@@ -116,19 +116,16 @@ const Background = new class {
 
         // FUNCTIONALITY //
         // Get background
-        const canvas = document.querySelector("#background");
+        this.canvas = document.querySelector("#background");
+        this.temp_canvas = document.querySelector("#temp-background");
 
-        // Get context
-        this.canvas = canvas;
-        this.temp_canvas = document.createElement("canvas");
+        this.context = this.canvas.getContext("2d");
+        this.temp_context = this.temp_canvas.getContext("2d");
 
         // Get screen size and set canvas size
         this.screen = { width: 0, height: 0 };
         this.prev_screen = this.screen;
         this.update_dims();
-
-        this.context = this.canvas.getContext("2d");
-        this.temp_context = this.temp_canvas.getContext("2d");
 
         this._src = "";
 
@@ -147,6 +144,9 @@ const Background = new class {
             width: window.innerWidth / this.downsample * window.devicePixelRatio,
             height: window.innerHeight / this.downsample * window.devicePixelRatio
         };
+
+        if (this.screen == this.prev_screen)
+            return;
 
         this.canvas.width = this.screen.width;
         this.canvas.height = this.screen.height;
@@ -177,30 +177,6 @@ const Background = new class {
 
     // Blurs the image.
     blur(sigma) {
-        ////amount /= this.downsample;
-        //console.log("Blur by " + amount + " px")
-//
-        //// Odd number
-        //if (amount % 2 == 0)
-        //    amount++;
-//
-        //// Generate kernel
-        //let kernel = [];
-        //let sigma = amount / 2;
-        //let sum = 0;
-//
-        //// Generate values
-        //for (let i = 0; i < amount; i++) {
-        //    const val = this.gaussian(i, amount, sigma)
-        //    sum += val;
-        //    kernel.push(val);
-        //}
-//
-        //// Normalize
-        //for (let i = 0; i < amount; i++) {
-        //    kernel[i] = kernel[i] / sum;
-        //}
-
         const GAUSSKERN = 6.0;
         let dim = parseInt(Math.max(3.0, GAUSSKERN * sigma));
         let sqrtSigmaPi2 = Math.sqrt(Math.PI*2.0)*sigma;
@@ -275,49 +251,41 @@ const Background = new class {
         this.temp_context.drawImage(img, start_x, start_y, size_x, size_y, 0, 0, -this.screen.width, this.screen.height);
 
         // Blur
-        const blur_percent = 0.035;
+        const blur_percent = 0.05; //0.035;
         this.blur(Math.ceil(Math.max(this.screen.width, this.screen.height) * blur_percent));
 
         // Brightness and contrast
-        this.brightness_and_contrast(0.6, 0.95);
+        this.brightness_and_contrast(0.5, 0.95);
 
-        this.fade_in_update(100);
+        this.fade_in_update(200);
     }
 
-    clear() {
+    clear(instant) {
+        console.log("CLEAR WAS CALLED")
         this.update_dims();
         this.temp_context.fillStyle = "#000";
         this.temp_context.fillRect(0, 0, this.screen.width, this.screen.height);
+        this.fade_in_update(instant ? 0 : 200);
     }
 
     fade_in_update(duration) {
-        if (!duration)
-            duration = 100;
-        
-        const old_ctx = document.createElement("canvas").getContext("2d");
-        old_ctx.width = this.screen.width;
-        old_ctx.height = this.screen.height;
-        old_ctx.drawImage(this.canvas, 0, 0);
+        if (duration < 0)
+            duration = 0;
 
-        const new_ctx = document.createElement("canvas").getContext("2d");
-        new_ctx.width = this.screen.width;
-        new_ctx.height = this.screen.height;
-        new_ctx.drawImage(this.temp_canvas, 0, 0);
-
+        this.temp_canvas.style.opacity = `0`;
         let frame_index = 0;
         
         function frame() {
             frame_index++;
-            if (frame_index > duration)
+            if (frame_index > duration) {
+                // Move temp to main for next fade
+                this.context.drawImage(this.temp_canvas, 0, 0);
+                this.temp_canvas.style.opacity = `0`;
+
                 return;
-
-            this.context.globalAlpha = (duration - frame_index) / duration
-            this.context.drawImage(old_ctx.canvas, 0, 0);
-            this.context.globalAlpha = frame_index / duration
-            this.context.drawImage(new_ctx.canvas, 0, 0);
-            this.context.globalAlpha = 1;
-
-            //this.context.drawImage(this.temp_canvas, 0, 0);
+            }
+                
+            this.temp_canvas.style.opacity = `${frame_index / duration}`;
             requestAnimationFrame(frame);
         }
 
@@ -327,7 +295,7 @@ const Background = new class {
 }
 
 export default Background;
-Background.clear();
+Background.clear(true);
 
 window.addEventListener("resize", () => {
     //console.log("ipdate")
