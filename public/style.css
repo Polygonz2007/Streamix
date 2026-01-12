@@ -34,6 +34,8 @@
 
     width: 100%;
     height: 100%;
+
+    image-rendering: pixelated;
 }
 
 #album-cover-container > #loading {
@@ -101,7 +103,7 @@ a:hover {
 }
 
 /**  BACKGROUND  **/
-#background {
+#background, #temp-background {
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
@@ -109,6 +111,10 @@ a:hover {
 
     box-shadow: inset #0004 0 0 max(10vw, 10vh);
     user-select: none;
+}
+
+#temp-background {
+    z-index: -998;
 }
 
 /**  CONTROLS  **/
@@ -144,6 +150,8 @@ a:hover {
 
 #seekbar-container > span {
     user-select: none;
+    width: 3.5rem;
+    text-align: center;
 }
 
 #seekbar {

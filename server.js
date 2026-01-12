@@ -312,7 +312,14 @@ app.post("/search", (req, res) => {
 
 
 
+// last fm
+app.get("/lastfm/auth", (req, res) => {
+    const token = req.params.token;
+    if (!token)
+        return res.send("Nahh");
 
+    // THIS IS JUST FO TESTING
+});
 
 
 
