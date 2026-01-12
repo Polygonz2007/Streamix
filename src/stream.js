@@ -35,7 +35,7 @@ const Stream = class {
 
         // Caching
         this.cache = [];
-        this.cache_size = 384;
+        this.cache_size = 256;
         this.cache_index = 0;
 
         // FFmpeg
@@ -139,15 +139,15 @@ const Stream = class {
 
         // OPUS
         if (format >= 3)
-            params = ["-f", "flac", "-max_probe_packets", "1", "-ac", "2", "-i", input, "-c:a", "libopus",  "-ar", "48000", "-b:a", "192k", "-application", "audio", "-frame_duration", "60", "-vbr", "on", "-cutoff", "0", "-flags", "+global_header", "-flush_packets", "1", "-f", "opus", output]; // Set bitrate, frame length, type, variable bitrate and fullband
+            params = ["-f", "flac", "-max_probe_packets", "1", "-ac", "2", "-i", input, "-c:a", "libopus",  "-ar", "48000", "-b:a", "128k", "-application", "audio", "-frame_duration", "60", "-vbr", "on", "-cutoff", "0", "-flags", "+global_header", "-flush_packets", "1", "-f", "opus", output]; // Set bitrate, frame length, type, variable bitrate and fullband
 
         // OPUS BITRATES
         if (format == 3)
-            params[13] = "384k"; // 384 kbps
+            params[13] = "256k"; // 256 kbps
         else if (format == 4)
-            params[13] = "192k"; // 192 kbps (default)
+            params[13] = "128k"; // 128 kbps (default)
         else if (format == 5)
-            params[13] = "96k"; // 96 kbps
+            params[13] = "64k"; // 64 kbps
         else if (format == 6)
             params[13] = "8k"; // 8 kbps (maybe replace with like 32k when serious)
 

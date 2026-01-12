@@ -373,8 +373,8 @@ UI.controls.previous.addEventListener("click", () => {
 document.addEventListener("keyup", (event) => {
     // Make sure user is not typing.
     const target = event.target;
-    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
-        return; // User is typing!
+    //if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+    //    return; // User is typing!
 
     // Pause
     switch (event.key) {

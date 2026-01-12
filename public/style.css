@@ -5,7 +5,7 @@
 /**  INFO  **/
 #info {
     position: fixed;
-    top: calc(50% - 4rem); left: 50%;
+    top: calc(50% - 3.5rem); left: 50%;
     transform: translate(-50%, -50%);
     width: min(calc(var(--album-cover-size) * 2), 100vw);
 
@@ -344,15 +344,19 @@ input.image:active {
     top: 0; left: 0;
     width: 100%; height: 100%;
     z-index: 10;
-    background-color: #0006;
+    background-color: #0003;
 
     visibility: hidden;
+    z-index: 20;
+
+    backdrop-filter: blur(1rem);
 }
 
 #settings-menu {
     position: fixed;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
+    z-index: 21;
 
     width: 64rem;
     height: 42rem;
@@ -377,8 +381,26 @@ input.image:active {
     left: var(--settings-sidebar-width);
     width: calc(100% - var(--settings-sidebar-width));
     height: 100%;
+    padding: 1.5rem;
 }
 
+label {
+    font-weight: 600;
+    display: block;
+    margin: 1.5rem 0 0.5rem 0;
+}
+
+#content > input[type="button"] {
+    border: none;
+    background-color: #444;
+    color: white;
+    padding: 0.5rem;
+    margin-right: 0.2rem;
+}
+
+#content > input[type="button"]:hover {
+    background-color: #777;
+}
 
 /* Phone Only */
 @media only screen and (max-width: 500px) {

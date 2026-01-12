@@ -232,9 +232,9 @@ export const Stream = new class {
             "None",
             "Max [Flac]",
             "CD [Flac]",
-            "High [Opus, 384 kbps]",
-            "Medium [Opus, 192 kbps]",
-            "Low [Opus, 96 kbps]",
+            "High [Opus, 256 kbps]",
+            "Medium [Opus, 128 kbps]",
+            "Low [Opus, 64 kbps]",
             "Trash [Opus, 24 kbps]"
         ]
 
@@ -500,6 +500,8 @@ export const Stream = new class {
         const track = Queue.tracks[track_index];
         const scaled_frame_index = Stream.format <= 2 ? Math.floor(frame_index / flac_frame_mult) : frame_index;
 
+        const start = performance.now(); // Timing
+
         // Switch track
         if (scaled_frame_index == 0) {
             const fmt = await Comms.ws_req({
@@ -546,8 +548,6 @@ export const Stream = new class {
             track.num_frames = Math.ceil(track.duration / ((this.format <= 2 ? flac_frame_size : opus_frame_size) / track.sample_rate));
             console.log(`Track\nSAMPLE RATE ${track.sample_rate}\nFORMAT ${this.format}\nN_FRAMES ${track.num_frames}`);
         }
-
-        const start = performance.now(); // Timing
         
         // Request it (get from cache or server)
         const data = await Comms.ws_req({
@@ -569,8 +569,10 @@ export const Stream = new class {
         // Create source and set to start
         const source = await this.create_source(decoded.channelData, decoded.samplesDecoded, track.sample_rate);
         let start_time = Queue.time_offset + track.get_block_time(scaled_frame_index);
-        console.log(`${Queue.time_offset.toFixed(2)} + ${track.get_block_time(scaled_frame_index).toFixed(2)} = ${start_time.toFixed(2)}`);
+        //console.log(`${Queue.time_offset.toFixed(2)} + ${track.get_block_time(scaled_frame_index).toFixed(2)} = ${start_time.toFixed(2)}`);
         source.start(start_time);
+
+        const end = performance.now();
 
         // info
         if (this.debug) {
@@ -580,6 +582,8 @@ export const Stream = new class {
                                                                     Start time: ${start_time.toFixed(2)}s
                                                                 </p>`;
         }
+
+        //console.log(`#${scaled_frame_index}\n=> Get ${(transfer - start).toFixed(3)}\n=> Decode ${(decode - transfer).toFixed(3)}\n=> Total ${(end - start).toFixed(3)}`)
 
         // Update headroom
         this.headroom++;

@@ -16,6 +16,7 @@ const elements = {
 }
 
 let width = 0;
+let height = 250;
 const canvas = document.querySelector("#buffer_bytes_graph");
 const ctx = canvas.getContext("2d");
 
@@ -72,27 +73,34 @@ function display_html() {
     elements.clients.innerText = `${data.clients} [${Utils.byte_size_string(data.buffer_bytes_rate / (0.125 * (data.clients || 1)), 0, false)}ps per client avg.]`;
 
     display_graph();
-    requestAnimationFrame(display_html);
+    //requestAnimationFrame(display_html);
 }
+
+let bufferbytesratesmooth = 0;
 
 function display_graph() {
     const data = get_stats();
 
+    bufferbytesratesmooth = Utils.lerp(bufferbytesratesmooth, data.buffer_bytes_rate, 0.05);
+
     // Draw
     ctx.fillStyle = "#F00";
-    ctx.fillRect(width - 1, 149 - Math.round((Math.floor(data.buffer_bytes_rate / (600_000 / 150)))), 1, 1);
+    ctx.fillRect(width - 1, (height - 1) - Math.round((Math.floor(bufferbytesratesmooth / (600_000 / height)))), 1, 1);
     
     // Shift to the left
     ctx.globalCompositeOperation = "copy";
-    ctx.drawImage(ctx.canvas,-1, 0);
+    ctx.drawImage(ctx.canvas, -1, 0);
     // reset back to normal for subsequent operations.
     ctx.globalCompositeOperation = "source-over"
 }
 
 function start_graph() {
-    width = window.screen.width;
+    width = window.innerWidth * devicePixelRatio;
+    height = 200 * window.devicePixelRatio;
     canvas.width = width;
-    console.log(width)
+    canvas.height = height;
+    canvas.style.width = width / window.devicePixelRatio;
+    canvas.style.height = height / window.devicePixelRatio;
 }
 
 // Start stats
@@ -103,3 +111,6 @@ setInterval(update_stats, update_rate * 1000);
 // start display
 start_graph()
 display_html();
+
+// temp
+setInterval(display_html, 25);

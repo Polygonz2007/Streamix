@@ -13,9 +13,9 @@ const formats = [
     "None",
     "Max [Flac]",
     "CD [Flac]",
-    "High [Opus, 384 kbps]",
-    "Medium [Opus, 192 kbps]",
-    "Low [Opus, 96 kbps]",
+    "High [Opus, 256 kbps]",
+    "Medium [Opus, 128 kbps]",
+    "Low [Opus, 64 kbps]",
     "Trash [Opus, 24 kbps]"
 ]
 
@@ -110,6 +110,9 @@ const Indexer = new class {
             sample_rate: data.format.sampleRate
         });
 
+        if (!track_id)
+            return false; // Track already exists. Do NOT index it
+
         // Add track artists
         for (let i = 0; i < artists.length; i++) {
             const track_artist = database.create_track_artist(track_id, artist_ids[i]);
@@ -150,15 +153,15 @@ const Indexer = new class {
         else if (format == 2)
             params = ["-f", "flac", "-i", input, "-frame_size", flac_frame_size, "-ar", "44100", "-sample_fmt", "s16", "-f", "flac", output]; // Downsample to 44.1khz, 16 bit
         else if (format >= 3)
-            params = ["-f", "flac", "-i", input, "-c:a", "libopus", "-ar", "48000", "-b:a", "192k", "-application", "audio", "-frame_duration", opus_frame_size, "-vbr", "on", "-f", "opus", output]; // Set bitrate, frame length, type, variable bitrate and fullband
+            params = ["-f", "flac", "-i", input, "-c:a", "libopus", "-ar", "48000", "-b:a", "128k", "-application", "audio", "-frame_duration", opus_frame_size, "-vbr", "on", "-f", "opus", output]; // Set bitrate, frame length, type, variable bitrate and fullband
 
         // OPUS BITRATES
         if (format == 3)
-            params[9] = "384k"; // 384 kbps
+            params[9] = "256k"; // 256 kbps
         else if (format == 4)
-            params[9] = "192k"; // 192 kbps (default)
+            params[9] = "128k"; // 128 kbps (default)
         else if (format == 5)
-            params[9] = "96k"; // 96 kbps
+            params[9] = "64k"; // 64 kbps
         else if (format == 6)
             params[9] = "24k"; // 24 kbps
 
