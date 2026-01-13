@@ -344,6 +344,7 @@ function shut_down() {
     console.log("\nSaving statistics and stopping server.");
 
     Stats.stats.clients = 0;
+    Stats.stats.cache = 0;
     Stats.save();
     process.exit(0);
 }

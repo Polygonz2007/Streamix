@@ -12,11 +12,12 @@ const body = document.querySelector("body");
 const elements = {
     buffer_bytes: document.querySelector("#buffer_bytes"),
     ws_req: document.querySelector("#ws_req"),
-    clients: document.querySelector("#clients")
+    clients: document.querySelector("#clients"),
+    cache: document.querySelector("#cache")
 }
 
 let width = 0;
-let height = 250;
+let height = 400;
 const canvas = document.querySelector("#buffer_bytes_graph");
 const ctx = canvas.getContext("2d");
 
@@ -71,6 +72,7 @@ function display_html() {
     elements.buffer_bytes.innerText = `${Utils.byte_size_string(data.buffer_bytes, 2, true)} [${Utils.byte_size_string(data.buffer_bytes_rate / 0.125)}ps]`;
     elements.ws_req.innerText = `${data.ws_req} [${data.ws_req_rate}/s]`;
     elements.clients.innerText = `${data.clients} [${Utils.byte_size_string(data.buffer_bytes_rate / (0.125 * (data.clients || 1)), 0, false)}ps per client avg.]`;
+    elements.cache.innerText = `${Utils.byte_size_string(data.cache)}`;
 
     display_graph();
     //requestAnimationFrame(display_html);
@@ -96,7 +98,7 @@ function display_graph() {
 
 function start_graph() {
     width = window.innerWidth * devicePixelRatio;
-    height = 200 * window.devicePixelRatio;
+    height = height * window.devicePixelRatio;
     canvas.width = width;
     canvas.height = height;
     canvas.style.width = width / window.devicePixelRatio;

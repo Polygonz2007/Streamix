@@ -164,7 +164,7 @@ a:hover {
 }
 
 #seekbar:hover {
-    cursor: pointer;
+    cursor: grab;
 
     #seekbar > #dot {
         filter: var(--glow);
@@ -420,5 +420,25 @@ label {
 
     #library {
         opacity: 25%;
+    }
+}
+
+@media only screen and (max-height: 750px) {
+    #library {
+        visibility: hidden;
+    }
+
+    hr {
+        visibility: hidden;
+    }
+
+    #album-cover-container {
+        float: left;
+    }
+
+    h1, h2 {
+        float: right;
+        text-align: left;
+        margin-left: 2rem;
     }
 }

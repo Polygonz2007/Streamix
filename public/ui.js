@@ -27,8 +27,8 @@ const Seekbar = new class {
         // Seeking behaviour
         this.div.addEventListener("mousedown", () => {
             this.seeking = true;
-            body.style.cursor = "grab";
-            this.div.style.cursor = "grab";
+            body.style.cursor = "grabbing";
+            this.div.style.cursor = "grabbing";
         });
 
         body.addEventListener("mouseup", () => {
@@ -38,7 +38,7 @@ const Seekbar = new class {
             this.seeking = false;
             Stream.seek(this.seeking_time);
             body.style.cursor = "";
-            this.div.style.cursor = "pointer";
+            this.div.style.cursor = "grab";
         });
     }
 

@@ -260,7 +260,7 @@ export const Stream = new class {
 
         // Global playback data
         // TODO: calculate headroom based of seconds of buffer. default = 15s
-        this.desired_headroom = 8; // How many buffers to load in advance
+        this.desired_headroom = 32; // How many buffers to load in advance
         this._headroom = 0; // How many buffers are loaded after the current one
 
         this.sources = [];

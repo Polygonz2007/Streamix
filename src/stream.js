@@ -37,6 +37,7 @@ const Stream = class {
         this.cache = [];
         this.cache_size = 256;
         this.cache_index = 0;
+        this.cache_mem_size = 0;
 
         // FFmpeg
         this.ffmpeg;
@@ -70,6 +71,13 @@ const Stream = class {
 
             this.cache = result;
             this.cache_index = 0;
+
+            Stats.log("cache", -this.cache_mem_size);
+            this.cache_mem_size = 0;
+            for (let i = 0; i < this.cache.length; i++) {
+                this.cache_mem_size += this.cache[i].frame_data.length;
+            }
+            Stats.log("cache", this.cache_mem_size);
 
             const end = performance.now();
             console.log(`Cache updated in ${(end - start).toFixed(3)}ms`);
