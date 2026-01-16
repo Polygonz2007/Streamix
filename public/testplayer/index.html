@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8"> <!-- Text -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0; viewport-fit=cover"/> <!-- Prevent zooming -->
+
+        <!-- Title -->
+        <title>Streamix</title>
+        
+        <!-- Global CSS -->
+        <link rel="stylesheet" href="/theme.css">
+        <link rel="stylesheet" href="/layout.css">
+
+        <!-- Page specific CSS -->
+        <link rel="stylesheet" href="/style.css">
+        <link rel="stylesheet" href="/trackbox.css">
+
+        <!-- PWA Manifest -->
+        <link rel="manifest" href="/manifest.json" />
+
+        <!-- Preload important stuff -->
+        <link rel="preload" href="/asset/logo/512/Winter.png">
+        <link rel="preload" href="/asset/icons/Loading.gif">
+    </head>
+
+    <body>
+        <div id="info">
+            <h1>Title [Number / Total]</h1>
+            <h2>Artist(s)</h2>
+            <h2>Album</h2>
+            <br>
+            <h2>Queue Index / Queue Length</h2>
+            <br>
+            <h2>Global Time / Track Time</h2>
+            <h2>Time Offset / Delay Offset</h2>
+            <br>
+            <h2>Buffer Health: ?</h2>
+            <h2>[format] @ [samplerate] hz</h2>
+        </div>
+
+        <!-- Paused: not playing, Active: a song is loaded -->
+        <div id="controls" class="paused">
+            <div id="seekbar-container">
+                <span id="time-played">0:00</span>
+                <div id="seekbar">
+                    <div id="line"></div>
+                    <div id="dot"></div>
+                </div>
+                <span id="time-remaining">-0:00</span>
+            </div>
+
+            <div id="control-buttons">
+                <input type="button" class="image" id="settings" />
+                <input type="button" class="image" id="previous" />
+                <input type="button" class="image" id="pause" />
+                <input type="button" class="image" id="next" />
+                <input type="button" class="image" id="volume" style="visibility: hidden;" />
+            </div>
+        </div>
+
+        <!-- Decoders -->
+        <script src="/decoders/flac-decoder-min.js"></script>
+        <script src="/decoders/opus-decoder-min.js"></script>
+
+        <!-- Scripts -->
+        <script type="module" src="/comms.js"></script>
+        <script type="module" src="./controller.js"></script>
+        <!--<script type="module" src="/library.js"></script>
+        <script type="module" src="/ui.js"></script>
+        <script type="module" src="/stream.js"></script>-->
+    </body>
+</html>

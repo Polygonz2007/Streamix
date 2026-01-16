@@ -233,14 +233,14 @@ input.image:active {
     filter: brightness(80%);
 }
 
-#pause { background-image: url("/asset/controls/Pause.svg"); }
+#pause { background-image: url("/asset/playback/Pause.svg"); }
 
 #controls.paused {
-    #pause { background-image: url("/asset/controls/Play.svg"); }
+    #pause { background-image: url("/asset/playback/Play.svg"); }
 }
 
-#previous { background-image: url("/asset/controls/Previous.svg"); }
-#next { background-image: url("/asset/controls/Next.svg"); }
+#previous { background-image: url("/asset/playback/Previous.svg"); }
+#next { background-image: url("/asset/playback/Next.svg"); }
 
 #settings { background-image: url("/asset/icons/Settings.svg"); }
 
