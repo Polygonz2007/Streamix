@@ -233,10 +233,10 @@ input.image:active {
     filter: brightness(80%);
 }
 
-#pause { background-image: url("/asset/playback/Pause.svg"); }
+#pause { background-image: url("/asset/playback/Play.svg"); }
 
-#controls.paused {
-    #pause { background-image: url("/asset/playback/Play.svg"); }
+#controls.playing {
+    #pause { background-image: url("/asset/playback/Pause.svg"); }
 }
 
 #previous { background-image: url("/asset/playback/Previous.svg"); }

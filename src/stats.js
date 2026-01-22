@@ -25,7 +25,7 @@ const Stats = new class {
     }
 
     async log(event, amount) {
-        if (!amount)
+        if (amount === undefined)
             amount = 1;
 
         if (!this.stats[event])

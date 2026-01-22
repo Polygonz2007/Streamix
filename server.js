@@ -104,7 +104,7 @@ wss.on('connection', (ws, req) => {
 
 
     ws.on('message', async (data, isBinary) => {
-        const start_time = performance.now();
+        //const start_time = performance.now();
 
         // Translate
         data = isBinary ? data : data.toString();
@@ -126,8 +126,8 @@ wss.on('connection', (ws, req) => {
             case 8: result = await wsi.log_played(client, data); break;
         }
 
-        const end_time = performance.now();
-        //console.log(`${(end_time - start_time).toFixed(2)}ms => Req #${req_id} from ${req.session.ip} of type ${type}`);
+        //const end_time = performance.now();
+        //console.log(`${(end_time - start_time).toFixed(2)}ms => Req #${data.req_id} from ${req.session.ip} of type ${type}`);
 
         Stats.log("ws_req");
         ws.send(result);
@@ -135,6 +135,7 @@ wss.on('connection', (ws, req) => {
 
     ws.on('close', () => {
         // Handle connection close
+        req.session.stream.close();
         Stats.log("clients", -1);
     });
 });

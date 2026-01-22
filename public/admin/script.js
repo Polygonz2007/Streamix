@@ -79,15 +79,23 @@ function display_html() {
 }
 
 let bufferbytesratesmooth = 0;
+let prev_y = height;
 
 function display_graph() {
     const data = get_stats();
 
     bufferbytesratesmooth = Utils.lerp(bufferbytesratesmooth, data.buffer_bytes_rate, 0.05);
 
-    // Draw
+    // Draw line
+    const y = (height - 1) - Math.round((Math.floor(bufferbytesratesmooth / (600_000 / height))));
+    const diff = y - prev_y;
     ctx.fillStyle = "#F00";
-    ctx.fillRect(width - 1, (height - 1) - Math.round((Math.floor(bufferbytesratesmooth / (600_000 / height)))), 1, 1);
+    ctx.fillRect(width - 1, diff < 0 ? y : prev_y, 1, Math.abs(y - prev_y) + 1);
+    prev_y = y;
+
+    // Draw area
+    ctx.fillStyle = "#F004";
+    ctx.fillRect(width - 1, y, 1, height - y);
     
     // Shift to the left
     ctx.globalCompositeOperation = "copy";

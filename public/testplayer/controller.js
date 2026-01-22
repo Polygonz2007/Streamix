@@ -1,37 +1,107 @@
 
-// import queue
+import Settings from "./settings.js";
+import Queue from "./queue.js";
 // import track object
 // import stream
+import Display from "./display.js";
 
 const Controller = new class {
     constructor() {
         /// PLAYBACK ///
-        this.playing = false;
+        this._playing = false;
         this.autoplay = true; // Go to next track when previous is done
-        this.queue_index = 0;
+        this.track;
 
         /// INPUT ///
         this.buttons = {
             "pause": document.querySelector("#pause"),
-            "next": document.querySelector("#next"),
-            "previous": document.querySelector("#previous")
+            "previous": document.querySelector("#previous"),
+            "next": document.querySelector("#next")
         }
         
+        // Bind functions
+        this.pause = this.pause.bind(this);
+        this.previous = this.previous.bind(this);
+        this.next = this.next.bind(this);
+
         // Add events
         this.buttons.pause.addEventListener("click", this.pause);
+        this.buttons.previous.addEventListener("click", this.previous);
+        this.buttons.next.addEventListener("click", this.next);
 
         // Keyboard shortcuts
-        window.addEventListener("keydown", (e) => {
+        document.addEventListener("keyup", (e) => {
+            // Make sure user is not typing.
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return; // User is typing!
+
+            // Controller shortcuts
             switch (e.key) {
-                case " ": this.pause(); break;
-                case ">": this.goto(); break;
-                case "<": this.pause(); break;
+                case Settings.keys.pause: this.pause(); break;
+                case Settings.keys.next: this.next(); break;
+                case Settings.keys.previous: this.previous(); break;
             }
         });
     }
 
+    get playing() {
+        return this._playing;
+    }
+
+    set playing(val) {
+        this._playing = val;
+        Display.set_playing(this.playing);
+        document.querySelector("body").style.backgroundColor = this.playing ? "#121" : "#111";
+    }
+
+    play(track) {
+        if (!track && this.track) {
+            Display.clear_track();
+            this.track = undefined;
+            this.playing = false;
+            return;
+        } else if (!track && !this.track) {
+            if (Queue.tracks.length == 0)
+                return;
+
+            track = Queue.tracks[0];
+        }
+
+        this.playing = true;
+        // STREAM TELL STREAM TO DO STUFF HERE
+        this.track = track;
+
+        Display.set_track(track);
+
+        // debug
+        document.querySelector("#queue-info").innerHTML = `${track.index + 1} / ${Queue.tracks.length}`
+    }
+
     pause() {
-        console.log("Mad")
+        if (this.track) {
+            this.playing = !this.playing;
+            return;
+        }
+
+        if (Queue.tracks.length > 0)
+            this.play(Queue.tracks[0]);
+    }
+
+    previous() {
+        if (!this.track) {
+            this.play(Queue.tracks[Queue.tracks.length - 1]); // Play last
+        } else {
+            this.play(Queue.tracks[this.track.index - 1]); // Play previous
+        }
+
+        
+    }
+
+    next() {
+        if (!this.track) {
+            this.play(Queue.tracks[0]); // Play first
+        } else {
+            this.play(Queue.tracks[this.track.index + 1]); // Play next
+        }
     }
 
     goto(index) {
@@ -42,3 +112,4 @@ const Controller = new class {
 console.log("yeh")
 
 export default Controller;
+window.controller = Controller

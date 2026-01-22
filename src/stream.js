@@ -211,8 +211,12 @@ const Stream = class {
         // Deallocate buffers
 
 
+        // Stats
+        Stats.log("cache", -this.cache_mem_size);
+
         // Kill ffmpeg
 
+        return;
     }
 }
 
