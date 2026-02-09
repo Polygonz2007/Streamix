@@ -36,6 +36,8 @@ const Display = new class {
         this.elements.title.innerHTML = track.track.name;
         this.elements.artist.innerHTML = artist_html;
         this.elements.album.innerHTML = `<span>from </span><a>${track.album.name}</a>`;
+
+        return true;
     }
 
     clear_track() {
@@ -44,6 +46,7 @@ const Display = new class {
         this.elements.album.innerHTML = `Album`;
 
         document.querySelector("#queue-info").innerHTML = `...`;
+        return true;
     }
 
     set_playing(playing) {
@@ -51,6 +54,12 @@ const Display = new class {
             this.elements.controls.classList.add("playing");
         else
             this.elements.controls.classList.remove("playing");
+    }
+
+    error(text) {
+        this.clear_track();
+        this.elements.title.innerHTML = text;
+        return true;
     }
 }
 

@@ -108,6 +108,7 @@ body {
     font-variant-numeric: tabular-nums;
 
     overflow: hidden; /* Bruh */
+    touch-action: none;
 
     /*position: absolute;
     width: 100vw;

@@ -148,8 +148,8 @@ const Indexer = new class {
         const input = "pipe:0";
         let output = "pipe:1";
 
-        const opus_frame_size = process.env.opus_frame_size || 20;
-        const flac_frame_size = (opus_frame_size * 48) * (Math.floor(process.env.flac_frame_mult) || 4); // opus frame size (ms) * 48 (k) (0.001 * 1000 = 1)
+        const opus_frame_size = process.env.opus_frame_size / 48; // samples / 48000 * 1000 ms
+        const flac_frame_size = process.env.flac_frame_size;
 
         // FLAC MAX, CD, AND OPUS
         if (format == 1)

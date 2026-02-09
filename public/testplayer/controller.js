@@ -2,7 +2,7 @@
 import Settings from "./settings.js";
 import Queue from "./queue.js";
 // import track object
-// import stream
+import Stream from "./stream.js";
 import Display from "./display.js";
 
 const Controller = new class {
@@ -39,6 +39,7 @@ const Controller = new class {
                 case Settings.keys.pause: this.pause(); break;
                 case Settings.keys.next: this.next(); break;
                 case Settings.keys.previous: this.previous(); break;
+                case "H": Stream.context.resume(); break;
             }
         });
     }
@@ -54,6 +55,7 @@ const Controller = new class {
     }
 
     play(track) {
+        // Handle tracks not existing
         if (!track && this.track) {
             Display.clear_track();
             this.track = undefined;
@@ -66,9 +68,19 @@ const Controller = new class {
             track = Queue.tracks[0];
         }
 
-        this.playing = true;
-        // STREAM TELL STREAM TO DO STUFF HERE
         this.track = track;
+
+        // Not tweak out when track hasnt loaded
+        if (!track.loaded) {
+            this.playing = false;
+            Display.error("Track not loaded");
+            return;
+        }
+
+        this.playing = true;
+        Stream.track_id = this.track.track_id;
+        Stream.test();
+        // STREAM TELL STREAM TO DO STUFF HERE
 
         Display.set_track(track);
 
@@ -108,8 +120,6 @@ const Controller = new class {
 
     }
 }
-
-console.log("yeh")
 
 export default Controller;
 window.controller = Controller
