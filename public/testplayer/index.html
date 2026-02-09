@@ -32,11 +32,11 @@
             <br>
             <h2 id="queue-info">Queue Index / Queue Length</h2>
             <br>
-            <h2>Global Time / Track Time</h2>
-            <h2>Time Offset / Delay Offset</h2>
+            <h2 id="time1">Global Time / Track Time</h2>
+            <h2 id="time2">Time Offset / Delay Offset</h2>
             <br>
-            <h2>Buffer Health: ?</h2>
-            <h2>[format] @ [samplerate] hz</h2>
+            <h2 if="buffer">Buffer Health: ?</h2>
+            <h2 id="quality">[format] @ [samplerate] hz</h2>
         </div>
 
         <canvas id="frame-debug"></canvas>
@@ -67,6 +67,7 @@
 
         <!-- Scripts -->
         <script type="module" src="/comms.js"></script>
+        <script type="module" src="./stream.js"></script>
         <script type="module" src="./controller.js"></script>
         <script type="module" src="./queue.js"></script>
         <script type="module" src="./display.js"></script>

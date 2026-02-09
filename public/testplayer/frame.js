@@ -1,4 +1,5 @@
 
+import Comms from "/comms.js";
 import Stream from "./stream.js";
 
 const Frame = class {
@@ -9,8 +10,15 @@ const Frame = class {
         this.sample_rate = sample_rate;
         this.index = index;
 
-        this.data;
-        this.buffer;
+        this.data; // The data (raw)
+        this.buffer; // The data (decoded samples)
+        this.source; // The audio
+        this.duration;
+
+        this.ready = false;
+        this.done = false;
+        this.start_time;
+        this.end_time;
     }
 
     /// PUBLIC FUNCTIONS ///
@@ -23,9 +31,7 @@ const Frame = class {
         });
 
         // Don't explode if no data
-        if (!data)
-            return false;
-
+        if (!data) return false;
         this.data = data;
 
         return true;
@@ -37,21 +43,43 @@ const Frame = class {
         if (!this.data) return false;
 
         // Decode
-        const decoded = await this.#decode();
-        if (decoded.error) {
-            console.log("deocde error")
-            console.error(decoded.error)
-            return; // make sure it stops idk
-        }
+        this.buffer = await this.#decode();
+        if (this.buffer.error)
+            return;
+
+        // Create source
+        this.source = await this.#create_source();
+        if (!this.source)
+            return;
+
+        // Add event for ending
+        this.source.addEventListener("ended", () => {
+            this.done = true;
+        });
+
+        this.duration = this.buffer.samplesDecoded / this.sample_rate;
+        this.ready = true;
+        return true;
+    }
+    
+    // Sets the frame to start playing at this time (ovverrides any old time)
+    start(time) {
+        this.start_time = time;
+        this.source.start(this.start_time);
     }
 
-    schedule(time) {
-        // Sets the frame to start playing at this time (ovverrides any old time)
-    }
+    // If time is present, frame stops playing at that time (if it is already playing)
+    // Otherwise, frame gets removed immediatley
+    stop(time) {
+        this.end_time = time;
+        
+        // Start at same time but end at the cancel time
+        if (time) this.source.start(this.start_time, this.end_time);
 
-    cancel(time) {
-        // If time is present, frame stops playing at that time (if it is already playing)
-        // Otherwise, frame gets removed immediatley
+        // Else, kill it immediatley
+        this.source.stop();
+        this.source.disconnect();
+        this.done = true;
     }
 
 
@@ -74,24 +102,25 @@ const Frame = class {
         }
     }
 
-    async #create_buffer() {
-        const samples = Stream.format 
-        const buffer = Stream.context.createBuffer(2, samples, sample_rate);
+    async #create_source() {
+        const samples = Stream.format_sample_size(this.format);
+        const buffer = Stream.context.createBuffer(2, samples, this.sample_rate);
 
         // Fill the buffer with the data
         for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
             const nowBuffering = buffer.getChannelData(channel);
-            for (let i = 0; i < num_samples; i++) {
-                nowBuffering[i] = data[channel][i];
+            for (let i = 0; i < this.buffer.samplesDecoded; i++) {
+                nowBuffering[i] = this.buffer.channelData[channel][i];
             }
         }
 
         // Get an AudioBufferSourceNode
-        const source = this.context.createBufferSource();
+        const source = Stream.context.createBufferSource();
         source.buffer = buffer;
-        source.connect(this.context.destination);
-        source.connect(this.analyser); // Vizaulizatn
+        source.connect(Stream.context.destination);
 
         return source;
     }
 }
+
+export default Frame;

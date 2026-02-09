@@ -14,6 +14,8 @@ const Track = class {
 
     async load() {
         const data = await Comms.fetch_json(`/track/${this.track_id}`);
+        if (!data)
+        return false;
 
         this.track = data.track;
         this.album = data.album;
@@ -72,9 +74,8 @@ export default Queue;
 window.queue = Queue;
 
 // Test casing
-const num_tracks = Math.ceil(Math.random() * 8);
+const num_tracks = Math.ceil(Math.random() * 20);
 for (let i = 0; i < num_tracks; i++) {
-    const track_id = Math.ceil(Math.random() * 617);
-    if (track_id == 537) track_id++;
+    const track_id = Math.ceil(Math.random() * 354);
     Queue.add(new Track(track_id));
 }

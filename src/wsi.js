@@ -3,9 +3,8 @@
 import * as database from "./database.js";
 
 
-//
-// FUNCTIONS
-///
+/// FUNCTIONS ///
+// Create default response
 function response(req_id, status) {
     let buf = new Buffer.alloc(4);
     buf.writeUInt16LE(req_id, 0);
@@ -13,6 +12,7 @@ function response(req_id, status) {
     return buf;
 }
 
+// Set the track that is being played
 export async function set_track(client, data) {
     // Check if track exists, and get meta
     const meta = database.get_track_format(data.track_id);

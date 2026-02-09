@@ -44,7 +44,7 @@ const Comms = new class {
         this.websocket.addEventListener("message", this.on_ws_message);
         this._ready_res();
 
-        return;
+        return true;
 
         this.connecting = true;
         this.reconnect_time = this.reconnect_time_init;
@@ -187,7 +187,7 @@ const Comms = new class {
         delta /= 1000;
 
         this.transfer_rate = this.transfer_rate * 0.5 + (data.byteLength / delta) * 0.5; // lerp, and keep track of seconds
-        debug_info.innerHTML = `Transfer total: ${mb.toFixed(1)} mb<br>Transfer rate:  ${(this.transfer_rate / (1000 / 8)).toFixed(1)} kbps`;
+        //debug_info.innerHTML = `Transfer total: ${mb.toFixed(1)} mb<br>Transfer rate:  ${(this.transfer_rate / (1000 / 8)).toFixed(1)} kbps`;
 
         this.prev_transfer_time = performance.now();
 
