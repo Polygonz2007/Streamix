@@ -9,6 +9,8 @@ import codec_parser, { duration } from "codec-parser";
 import { spawn } from "child_process";
 import { Readable } from "stream";
 
+import Utils from "./util.js";
+
 const formats = [
     "None",
     "Max [Flac]",
@@ -20,9 +22,59 @@ const formats = [
 ]
 
 const Indexer = new class {
-    //constructor(auto_update) {
-    //    this.auto_update = auto_update;
-    //}
+    constructor(auto_update) {
+        this.auto_update = auto_update;
+        this.max_threads = 8; // Max threads to use at once while indexing data
+
+        // Indexing
+        this.jobs = new Map(); // Job index -> Track id and format
+        this.files = new Map(); // Track id -> path
+        this.file_data = new Map(); // Track id -> Uint8Buf
+        this.job_index = 0; // Increments
+        this.threads = 0;
+    }
+
+    async check_jobs() {
+        if (this.jobs.size == 0)
+            return; // Nothing more to do
+
+        if (this.threads >= this.max_threads)
+            return; // No more threads available. Just wait until next thread is done
+
+        // Pick a job
+        const job = this.jobs.entries().next();
+        this.threads++;
+        const index = job.value[0];
+        const params = job.value[1];
+
+        // Remove (claim) it
+        this.jobs.delete(index);
+
+        // Check if we have read file. If not, read it into file data
+        let file_data = this.file_data.get(params.track_id);
+        if (!file_data) {
+            const path = this.files.get(params.track_id);
+            this.file_data.set(params.track_id, await fs.readFile(path));
+        }
+
+        // Run the job (index file)
+        await this.index_data(this.file_data.get(params.track_id), params.track_id, params.format);
+
+        // Check if any more jobs need this file
+        let jobs_with_file = 0;
+            this.jobs.forEach((value, key, map) => {
+                if (value.track_id == params.track_id) jobs_with_file++;
+        });
+
+        // Remove usued file data
+        if (jobs_with_file == 0) {
+            this.files.delete(params.track_id);
+            this.file_data.delete(params.track_id);
+        }
+
+        // Keep the chain going
+        this.check_jobs();
+    }
 
     async index_meta(file) {
         // Get and parse metadata
@@ -148,8 +200,9 @@ const Indexer = new class {
         const input = "pipe:0";
         let output = "pipe:1";
 
-        const opus_frame_size = process.env.opus_frame_size / 48; // samples / 48000 * 1000 ms
-        const flac_frame_size = process.env.flac_frame_size;
+        // Get frame size (if not present, use defaults)
+        const opus_frame_size = (process.env.opus_frame_size || 960) / 48; // samples / 48000 * 1000 ms
+        const flac_frame_size = process.env.flac_frame_size || 4096;
 
         // FLAC MAX, CD, AND OPUS
         if (format == 1)
@@ -221,6 +274,7 @@ const Indexer = new class {
             offset += len_arr[i];
         }
 
+        this.threads--;
         return arrbuf;
     }
 
@@ -261,7 +315,7 @@ const Indexer = new class {
     }
 
     async scan(directory) {
-        console.log(`Indexing tracks from "${directory}"...`);
+        console.log(`\nIndexing tracks from "${directory}"...`);
 
         // Check if directory exists
         if (!existsSync(directory)) {
@@ -275,8 +329,6 @@ const Indexer = new class {
 
         const num_files = files.length;
         process.stdout.write(`\Scanning ${num_files} files for indexing...\n`);
-
-        let num_files_added = 0;
 
         for (let i = 0; i < files.length; i++) {
             const time_start = performance.now();
@@ -293,35 +345,43 @@ const Indexer = new class {
             if (!meta_status)
                 continue;
 
-            process.stdout.clearLine(0); process.stdout.cursorTo(0);
-            process.stdout.write(`${(((i / num_files) * 100).toFixed(1))}% | Indexing track #${meta_status.track_id} ["${meta_status.track_name}"]`);
+            // Store for the jobs
+            this.files.set(meta_status.track_id, file_path);
 
-            // Read file data
-            const data = await fs.readFile(file_path);
-
-            // Transcode to quality levels we need
-            let promises = [];
+            // Add transcoding to quality levels we need to queue of jobs
             for (let format = meta_status.format; format <= 6; format++) {
-                promises.push(new Promise(async (res, rej) => {
-                    await this.index_data(data, meta_status.track_id, format);
-                    res();
-                }));
+                this.job_index++;
+                this.jobs.set(this.job_index, {
+                    track_id: meta_status.track_id,
+                    format: format
+                });
             }
-
-            // Transcode all formats at once
-            await Promise.all(promises);
-
-            const time_end = performance.now();
-            process.stdout.clearLine(); process.stdout.cursorTo(0);
-            process.stdout.write(`${Math.floor(time_end - time_start)}ms => Indexed track #${meta_status.track_id} ["${meta_status.track_name}"]\n`);
-            num_files_added++;
         }
-        
-        console.log(`\nTracks for "${directory}" indexed.`);
-        if (num_files_added == 0)
+
+        // If no jobs, say so
+        const total_jobs = this.jobs.size;
+        if (total_jobs == 0) {
             console.log("Database is up to date!");
-        else
-            console.log(`Successfully indexed ${num_files_added} new tracks.`);
+            return;
+        }
+
+        // Start indexing of everything and log progress (setInterval, overwrite same line, with progress of jobs)
+        console.log(`Found ${this.files.size} tracks for indexing. Transcoding to ${total_jobs} tracks and quality levels.`);
+
+        // Start
+        for (let i = 0; i < this.max_threads; i++)
+            this.check_jobs();
+        
+        while (this.jobs.size !== 0) {
+            // Print info
+            Utils.overwrite_line(`Finished ${total_jobs - this.jobs.size} of ${total_jobs} jobs. [${(100 * (total_jobs - this.jobs.size) / total_jobs).toFixed(2)}%].`);
+
+            // Wait
+            await Utils.wait(1000);
+        }
+
+        Utils.overwrite_line(`Finished ${total_jobs} of ${total_jobs} jobs. [100.00%].\n`);
+        console.log("Database is up to date.");
 
         return true;
     }

@@ -40,7 +40,6 @@ export async function set_track(client, data) {
 
 export async function set_format(client, data) {
     // Get track max format
-    console.log("finding track format for track #" + client.stream.track_id)
     const meta = database.get_track_format(client.stream.track_id);
     if (!meta)
         return response(data.req_id, 0); // WTF HOW

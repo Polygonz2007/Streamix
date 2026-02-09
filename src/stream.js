@@ -80,7 +80,7 @@ const Stream = class {
             Stats.log("cache", this.cache_mem_size);
 
             const end = performance.now();
-            console.log(`Cache updated in ${(end - start).toFixed(3)}ms`);
+            //console.log(`Cache updated in ${(end - start).toFixed(3)}ms`);
         }
 
         // Get next buffer and tellem taishi
