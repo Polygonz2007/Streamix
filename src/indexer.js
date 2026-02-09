@@ -68,8 +68,12 @@ const Indexer = new class {
         if (!album_id) {
             let album_image = null;
 
-            // Check folder for album cover (usually higher quality)
-            const cover_path = path.join(file.parentPath, "cover.jpg");
+            // Check folder for album cover, in both jpg and png
+            let cover_path = path.join(file.parentPath, "cover.jpg");
+            if (existsSync(cover_path))
+                album_image = await fs.readFile(cover_path);
+
+            cover_path = path.join(file.parentPath, "cover.png");
             if (existsSync(cover_path))
                 album_image = await fs.readFile(cover_path);
 
