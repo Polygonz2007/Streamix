@@ -4,7 +4,7 @@ import UI    from "/ui.js";
 
 // temporary
 const opus_frame_size = 960;
-const flac_frame_mult = 4;
+const flac_frame_mult = 4.2666666667;
 const flac_frame_size = opus_frame_size * flac_frame_mult;
 
 class Track {

@@ -37,6 +37,8 @@ const Display = new class {
         this.elements.artist.innerHTML = artist_html;
         this.elements.album.innerHTML = `<span>from </span><a>${track.album.name}</a>`;
 
+        document.querySelector("body").style.backgroundImage = `url("/album/${track.album.id}/16.jpg")`;
+
         return true;
     }
 

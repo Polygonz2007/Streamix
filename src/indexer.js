@@ -24,7 +24,7 @@ const formats = [
 const Indexer = new class {
     constructor(auto_update) {
         this.auto_update = auto_update;
-        this.max_threads = 8; // Max threads to use at once while indexing data
+        this.max_threads = 10; // Max threads to use at once while indexing data
 
         // Indexing
         this.jobs = new Map(); // Job index -> Track id and format
@@ -316,6 +316,7 @@ const Indexer = new class {
 
     async scan(directory) {
         console.log(`\nIndexing tracks from "${directory}"...`);
+        const time_start = performance.now();
 
         // Check if directory exists
         if (!existsSync(directory)) {
@@ -327,12 +328,7 @@ const Indexer = new class {
         const files = (await fs.readdir(directory, { withFileTypes: true, recursive: true }))
                         .filter(dirent => dirent.isFile() && dirent.name.endsWith(".flac"));
 
-        const num_files = files.length;
-        process.stdout.write(`\Scanning ${num_files} files for indexing...\n`);
-
-        for (let i = 0; i < files.length; i++) {
-            const time_start = performance.now();
-            
+        for (let i = 0; i < files.length; i++) {    
             const file = files[i];
             const file_path = path.join(file.parentPath, file.name);
 
@@ -360,13 +356,11 @@ const Indexer = new class {
 
         // If no jobs, say so
         const total_jobs = this.jobs.size;
-        if (total_jobs == 0) {
-            console.log("Database is up to date!");
+        if (total_jobs == 0)
             return;
-        }
 
         // Start indexing of everything and log progress (setInterval, overwrite same line, with progress of jobs)
-        console.log(`Found ${this.files.size} tracks for indexing. Transcoding to ${total_jobs} tracks and quality levels.`);
+        console.log(`Found ${this.files.size} tracks for indexing.`);
 
         // Start
         for (let i = 0; i < this.max_threads; i++)
@@ -380,8 +374,10 @@ const Indexer = new class {
             await Utils.wait(1000);
         }
 
-        Utils.overwrite_line(`Finished ${total_jobs} of ${total_jobs} jobs. [100.00%].\n`);
-        console.log("Database is up to date.");
+        const time_end = performance.now();
+
+        Utils.overwrite_line(`Finished ${total_jobs} of ${total_jobs} jobs. [100.00%]\n`);
+        console.log(`Time spent: ${((time_end - time_start) / (60 * 1000)).toFixed(2)} minutes.`);
 
         return true;
     }

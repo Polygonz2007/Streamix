@@ -24,7 +24,7 @@ const Stream = new class {
         this.flac_frame_size = 3840; // Get automatically
         this.opus_frame_size = 960;
 
-        this.test2 = this.test2.bind(this);
+        //this.test2 = this.test2.bind(this);
 
     }
 

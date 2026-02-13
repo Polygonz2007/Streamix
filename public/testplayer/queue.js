@@ -74,8 +74,8 @@ export default Queue;
 window.queue = Queue;
 
 // Test casing
-const num_tracks = Math.ceil(Math.random() * 20);
+const num_tracks = 468;//Math.ceil(Math.random() * 20);
 for (let i = 0; i < num_tracks; i++) {
-    const track_id = Math.ceil(Math.random() * 354);
+    const track_id = i+1;//Math.ceil(Math.random() * 354);
     Queue.add(new Track(track_id));
 }

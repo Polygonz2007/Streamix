@@ -17,22 +17,6 @@ import Indexer from "./src/indexer.js";
 import Stream from "./src/stream.js";
 import * as wsi from "./src/wsi.js";
 
-// Let us do stats
-await Stats.load();
-
-// Open database
-database.open();
-
-// Find and scan directories
-(async () => {
-    const music_path = process.env.music_path;
-    let music_dirs = music_path.split(";");
-    for (let i = 0; i < music_dirs.length; i++) {
-        music_dirs[i] = music_dirs[i].trim();
-        await Indexer.scan(music_dirs[i]);
-    }
-})();
-
 
 // Path
 import path from 'path';
@@ -324,14 +308,35 @@ app.get("/lastfm/auth", (req, res) => {
 
 
 
+async function startup() {
+    process.title = "Streamix";
 
+    // Clear console
+    process.stdout.write('\x1Bc');
+    console.log("// Streamix v0.1 //");
+    console.log(`HTTP server running. [:${config.http_port}]`);
+
+    // Let us do stats
+    await Stats.load();
+    Stats.log("startups");
+
+    // Open database
+    database.open();
+
+    // Set up indexer
+    const music_path = process.env.music_path;
+    let music_dirs = music_path.split(";");
+    for (let i = 0; i < music_dirs.length; i++) {
+        music_dirs[i] = music_dirs[i].trim();
+        await Indexer.scan(music_dirs[i]);
+    }
+
+    console.log("Database is up to date.");
+}
 
 // Start server
 app.use(express.static(global.public_path));
-http_server.listen(config.http_port, () => {
-    console.log(`HTTP server running on ${config.http_port}.`);
-    Stats.log("startups");
-});
+http_server.listen(config.http_port, startup);
 
 //https_server.listen(config.https_port, () => {
 //    console.log(`HTTPS server running on port ${config.https_port}.`);

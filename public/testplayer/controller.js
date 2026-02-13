@@ -79,7 +79,7 @@ const Controller = new class {
 
         this.playing = true;
         Stream.track_id = this.track.track_id;
-        Stream.test();
+        //Stream.test();
         // STREAM TELL STREAM TO DO STUFF HERE
 
         Display.set_track(track);
