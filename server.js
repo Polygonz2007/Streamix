@@ -177,9 +177,6 @@ app.get("/album/:album_id/:filename", (req, res) => {
     if (size < 32) // Too small
         size = 32;
 
-    if (size > 2048) // Too big
-        size = 2048;
-
     //return res.contentType("image/jpeg").send(img);
 
     // Scale image to desired size and send
