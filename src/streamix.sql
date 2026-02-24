@@ -1,3 +1,9 @@
+CREATE TABLE genres (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name varchar(255),
+    description varchar(1027)
+);
+
 CREATE TABLE artists (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -27,7 +33,13 @@ CREATE TABLE tracks (
     format TINYINT NOT NULL -- Highest format this track has. For example, 44.1khz 16 bit track has format 2
 );
 
-CREATE TABLE track_artists ( -- If a track is made by multiple artists (not the same as album_artist) this table tells you who made the song
+CREATE TABLE track_genres (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    track_id INTEGER NOT NULL REFERENCES tracks(id),
+    genre_id INTEGER NOT NULL REFERENCES genres(id)
+);
+
+CREATE TABLE track_artists (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     track_id INTEGER NOT NULL REFERENCES tracks(id),
     artist_id INTEGER NOT NULL REFERENCES artists(id)
