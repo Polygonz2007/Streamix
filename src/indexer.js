@@ -24,7 +24,8 @@ const formats = [
 const Indexer = new class {
     constructor(auto_update) {
         this.auto_update = auto_update;
-        this.max_threads = 10; // Max threads to use at once while indexing data
+        this.max_threads = 8; // Max threads to use at once while indexing data
+        this.max_format = 1; // Highest quality format that the indexer will index to
 
         // Indexing
         this.jobs = new Map(); // Job index -> Track id and format
@@ -345,7 +346,11 @@ const Indexer = new class {
             this.files.set(meta_status.track_id, file_path);
 
             // Add transcoding to quality levels we need to queue of jobs
-            for (let format = meta_status.format; format <= 6; format++) {
+            let start_format = meta_status.format;
+            if (start_format < this.max_format)
+                start_format = this.max_format;
+
+            for (let format = start_format; format <= 6; format++) {
                 this.job_index++;
                 this.jobs.set(this.job_index, {
                     track_id: meta_status.track_id,

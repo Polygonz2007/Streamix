@@ -68,7 +68,7 @@ export async function next_buffer(client, data) {
     // Add the req id to start
     const buffer = Buffer.alloc(frame.frame_data.length + 2);
     buffer.writeUint16LE(data.req_id, 0);
-    frame.frame_data.copy(buffer, 2);
+    buffer.set(frame.frame_data, 2);
 
     return buffer;
 }

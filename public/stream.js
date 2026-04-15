@@ -227,7 +227,7 @@ export const Stream = new class {
         this.webworkers = false;
 
         this.format = 0; // We dont know what format we can use yet
-        this.req_format = 1; // The format we want to use, but may not have switched yet
+        this.req_format = 6; // The format we want to use, but may not have switched yet
         this.formats = [
             "None",
             "Max [Flac]",

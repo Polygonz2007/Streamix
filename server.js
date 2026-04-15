@@ -309,7 +309,7 @@ async function startup() {
     process.title = "Streamix";
 
     // Clear console
-    process.stdout.write('\x1Bc');
+    console.clear();
     console.log("// Streamix v0.1 //");
     console.log(`HTTP server running. [:${config.http_port}]`);
 
