@@ -357,6 +357,8 @@ const Indexer = new class {
                     format: format
                 });
             }
+
+            Utils.overwrite_line(`Scanned ${i} of ${files.length} files. [${(100 * i / files.length).toFixed(2)}%].`);
         }
 
         // If no jobs, say so
@@ -365,7 +367,7 @@ const Indexer = new class {
             return;
 
         // Start indexing of everything and log progress (setInterval, overwrite same line, with progress of jobs)
-        console.log(`Found ${this.files.size} tracks for indexing.`);
+        Utils.overwrite_line(`Found ${this.files.size} tracks for indexing.`);
 
         // Start
         for (let i = 0; i < this.max_threads; i++)
@@ -380,9 +382,7 @@ const Indexer = new class {
         }
 
         const time_end = performance.now();
-
-        Utils.overwrite_line(`Finished ${total_jobs} of ${total_jobs} jobs. [100.00%]\n`);
-        console.log(`Time spent: ${((time_end - time_start) / (60 * 1000)).toFixed(2)} minutes.`);
+        Utils.overwrite_line(`Successfully indexed ${files.length} tracks [${total_jobs} jobs] in ${((time_end - time_start) / (60 * 1000)).toFixed(2)} minutes.\n`);
 
         return true;
     }
