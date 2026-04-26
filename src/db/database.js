@@ -1,27 +1,18 @@
 
-// This module is responsible for handling database interaction by the app, in a safe and proper way.
+// Handles database interaction on a low level.
 
-import * as stats from "./stats.js";
-import fs, { ftruncateSync } from "fs";
+import Stats from "../stats.js";
+import fs from "fs";
 
 import { Database } from "bun:sqlite";
 let db;
 
-//const bcrypt = require("bcrypt");
-//const salt_rounds = 10;
-
 // Setup the database
 export function setup() {
-    const setup_file = "./src/streamix.sql";
+    const setup_file = "./src/db/db.sql";
     const setup_string = fs.readFileSync(setup_file).toString();
 
-    const queries = setup_string.split(";");
-
-    for (let i = 0; i < queries.length - 1; i++) { // everything except last empty query
-        db.query(queries[i]).run();
-    }
-
-    return true;
+    return db.run(setup_string);
 }
 
 export function open() {

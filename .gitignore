@@ -6,9 +6,9 @@ node_modules
 certs/*
 
 # Database
-src/streamix.db
-src/streamix.db-shm
-src/streamix.db-wal
+src/db/streamix.db
+src/db/streamix.db-shm
+src/db/streamix.db-wal
 
 # Stats
 stats.json
