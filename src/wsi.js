@@ -1,6 +1,6 @@
 
 // IMPORTS
-import * as database from "./database.js";
+import * as database from "./db/database.js";
 
 
 /// FUNCTIONS ///

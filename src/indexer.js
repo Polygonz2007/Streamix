@@ -4,7 +4,10 @@ import * as fs from "fs/promises";
 import { existsSync, read } from "fs";
 import path from "path";
 import { parseFile as parse_metadata } from 'music-metadata';
-import * as database from "./database.js";
+
+import * as database from "./db/database.js";
+import * as dbi from "./db/dbi.js";
+
 import codec_parser, { duration } from "codec-parser";
 import { spawn } from "child_process";
 import { Readable } from "stream";
@@ -25,7 +28,7 @@ const Indexer = new class {
     constructor(auto_update) {
         this.auto_update = auto_update;
         this.max_threads = 8; // Max threads to use at once while indexing data
-        this.max_format = 1; // Highest quality format that the indexer will index to
+        this.max_level = 0; // Highest quality level that the indexer will index to
 
         // Indexing
         this.jobs = new Map(); // Job index -> Track id and format
@@ -82,118 +85,23 @@ const Indexer = new class {
         const file_path = path.join(file.parentPath, file.name);
         const data = await parse_metadata(file_path);
 
-        // Add artist(s) if it does not exist yet
-        let artists = data.common.artists || false;
-        let artist_ids = [];
-        let album_artist = data.common.albumartist || artists[0] || false;
+        // Add to database
+        let creator_type = "artist";
 
-        if (!artists) {
-            database.log_error("artist", file_path, "no artists found");
-            return false;
-        }
+        let collection_type = "album";
+        if (data.common.track.of <= 6)
+            collection_type = "ep";
+        if (data.common.track.of == 1)
+            collection_type = "single";
 
-        // Create album artist
-        let album_artist_id = database.get_artist_name(album_artist);
+        const creator_id = dbi.creator(data.common.albumartist || data.common.artists[0], creator_type);
+        const collection_id = dbi.collection(data.common.album, collection_type, creator_id);
+        const track_id = dbi.new_track(data.common.title, data.common.track.no, data.common.disk.no, data.format.duration, data.common.releasedate, collection_id, data.common.artists || [], data.common.genre || []);
+        console.log(creator_id, collection_id, track_id);
 
-        if (!album_artist_id)
-            album_artist_id = database.create_artist(album_artist);
 
-        // Create other artists
-        for (let i = 0; i < artists.length; i++) {
-            const artist = artists[i];
-            let artist_id = database.get_artist_name(artist);
-
-            if (!artist_id)
-                artist_ids[i] = database.create_artist(artist);
-            else
-                artist_ids[i] = artist_id;
-        }
-
-        // Add album if it does not exist yet
-        let album = data.common.album || false;
-        if (!album) {
-            database.log_error("album", file_path, "no album found");
-            return false;
-        }
-
-        let album_id = database.get_album_name(album);
-
-        if (!album_id) {
-            let album_image = null;
-
-            // Check folder for album cover, in both jpg and png
-            let cover_path = path.join(file.parentPath, "cover.jpg");
-            if (existsSync(cover_path))
-                album_image = await fs.readFile(cover_path);
-
-            cover_path = path.join(file.parentPath, "cover.png");
-            if (existsSync(cover_path))
-                album_image = await fs.readFile(cover_path);
-
-            // Check file for album cover, if there is none in folder
-            if (!album_image && data.common.picture)
-                album_image = data.common.picture[0].data;
-
-            // Get year
-            const album_year = data.common.year;
-
-            album_id = database.create_album(album, album_artist_id, album_image, album_year);
-        }
-
-        // Find track name
-        let track = data.common.title;
-        if (!track) {
-            database.log_error("track", file_path, "no track title found");
-            return false;
-        }
-
-        let number = data.common.track.no || 0;
-        if (!number) {
-            database.log_error("track", file_path, "no track number found");
-        }
-
-        // Find highest fitting quality level (for now, just check if it is higher than 44.1khz 16 bit)
-        const sample_rate = data.format.sampleRate;
-        const bit_depth = data.format.bitsPerSample;
-
-        let format = 1;
-        if (sample_rate <= 44100 && bit_depth <= 16)
-            format = 2;
-        
-        // Add track if it does not exist
-        const track_id = database.create_track(track, number, album_id, file_path, {
-            format: format,
-            duration: data.format.duration,
-            sample_rate: data.format.sampleRate
-        });
-
-        if (!track_id)
-            return false; // Track already exists. Do NOT index it
-
-        // Add track artists
-        for (let i = 0; i < artists.length; i++) {
-            const track_artist = database.create_track_artist(track_id, artist_ids[i]);
-            if (!track_artist)
-                database.log_error("track_artist", file_path, `failed to add track artist "${artists[i]}"`);
-        }
-
-        // Add track to search index
-        let keywords = "";
-        keywords += `${track} ${number} ${album}`;
-        for (let i = 0; i < artists.length; i++) {
-            keywords += ` ${artists[i]}`;
-        }
-
-        database.create_search_entry(track_id, track, album, artists);
-
-        // Return info
-        return {
-            format: format,
-            sample_rate: sample_rate,
-            bit_depth: bit_depth,
-            track_id: track_id,
-            track_name: track
-        };
+        // Later add more data
+        return true;
     }
 
     async transcode(data, format) {
@@ -334,13 +242,15 @@ const Indexer = new class {
             const file_path = path.join(file.parentPath, file.name);
 
             // Check that we have not parsed this before
-            if (database.get_track_by_path(file_path))
-                continue;
+            //if (database.get_track_by_path(file_path))
+            //    continue;
 
             // Add metadata to database, skip track if failed
             const meta_status = await this.index_meta(file);
             if (!meta_status)
                 continue;
+
+            continue;
 
             // Store for the jobs
             this.files.set(meta_status.track_id, file_path);

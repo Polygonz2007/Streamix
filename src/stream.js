@@ -12,7 +12,7 @@
 import { spawn } from "child_process";
 import { Readable, Writable } from "stream";
 
-import * as database from "./database.js";
+import * as database from "./db/database.js";
 import Stats from "./stats.js";
 import { appendFileSync, createWriteStream, readFileSync, writeFileSync } from "fs";
 

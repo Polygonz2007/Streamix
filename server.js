@@ -10,7 +10,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // Imports
-import * as database from "./src/database.js";
+import * as database from "./src/db/database.js";
+import * as dbi from "./src/db/dbi.js";
 import Stats from "./src/stats.js";
 
 import Indexer from "./src/indexer.js";
