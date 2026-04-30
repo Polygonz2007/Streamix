@@ -47,12 +47,13 @@ export function open() {
 
 
 // CREATOR
-export function add_creator(name, type_id) {
+export function add_creator(name, type_id, generated) {
     // Insert
-    const insert = db.prepare("INSERT INTO creator(name, type_id) VALUES ($name, $type_id)");
+    const insert = db.prepare("INSERT INTO creator(name, type_id, generated) VALUES ($name, $type_id, $generated)");
     const result = insert.run({
         $name: name,
-        $type_id: type_id
+        $type_id: type_id,
+        $generated: generated
     });
 
     return result.lastInsertRowid;
@@ -113,13 +114,14 @@ export function add_creator_image(creator_id, level, image) {
 }
 
 // COLLECTION
-export function add_collection(name, creator_id, type_id) {
+export function add_collection(name, creator_id, type_id, generated) {
     // Insert
-    const insert = db.prepare("INSERT INTO collection(name, creator_id, type_id) VALUES ($name, $creator_id, $type_id)");
+    const insert = db.prepare("INSERT INTO collection(name, creator_id, type_id, generated) VALUES ($name, $creator_id, $type_id, $generated)");
     const result = insert.run({
         $name: name,
         $creator_id: creator_id,
-        $type_id: type_id
+        $type_id: type_id,
+        $generated: generated
     });
 
     return result.lastInsertRowid;
@@ -285,3 +287,38 @@ export function add_track_collection(track_id, collection_id, position) {
 
 
 // TRACK_FRAME
+export function add_track_frames(track_id, format_id, frames) {
+    if (frames.length == 0)
+        return false;
+
+    // Insert
+    const insert = db.prepare("INSERT INTO track_frame(track_id, format_id, frame_index, frame_size, frame_data) VALUES ($track_id, $format_id, $frame_index, $frame_size, $frame_data)");
+    const result = db.transaction((track_id, format_id, frames) => {
+        let frame_num = 0;
+        for (let i = 0; i < frames.length; i++) {
+            const data = {
+                $track_id: track_id,
+                $format_id: format_id,
+                $frame_index: i,
+                $frame_size: frames[i].data.byteLength,
+                $frame_data: frames[i].data
+            };
+
+            insert.run(data);
+            frame_num++;
+        }
+
+        return frame_num;
+    })(track_id, format_id, frames);
+
+    return result;
+}
+
+// FORMAT
+export function get_formats() {
+    // Insert
+    const insert = db.prepare("SELECT * FROM format ORDER BY format.level ASC");
+    const result = insert.all();
+
+    return result;
+}

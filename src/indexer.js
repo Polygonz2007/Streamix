@@ -94,18 +94,24 @@ const Indexer = new class {
         if (data.common.track.of == 1)
             collection_type = "single";
 
-        const creator_id = dbi.creator(data.common.albumartist || data.common.artists[0], creator_type);
-        const collection_id = dbi.collection(data.common.album, collection_type, creator_id);
-        const track_id = dbi.new_track(data.common.title, data.common.track.no, data.common.disk.no, data.format.duration, data.common.releasedate, collection_id, data.common.artists || [], data.common.genre || []);
-        console.log(creator_id, collection_id, track_id);
-
+        const creator_id = dbi.creator(data.common.albumartist || data.common.artists[0], creator_type, true);
+        const collection_id = dbi.collection(data.common.album, collection_type, creator_id, true);
+        const track_id = dbi.track(data.common.title, data.common.track.no, data.common.disk.no, data.format.duration, data.common.releasedate, collection_id, data.common.artists || [], data.common.genre || []);
 
         // Later add more data
-        return true;
+        return {
+            creator_id: creator_id,
+            collection_id: collection_id,
+            track_id: track_id,
+
+            lossless: data.format.lossless,
+            samplerate: data.format.sampleRate,
+            bitrate: data.format.bitrate,
+            bitdepth: data.format.bitsPerSample
+        };
     }
 
     async transcode(data, format) {
-        let params;
         const input = "pipe:0";
         let output = "pipe:1";
 
@@ -113,23 +119,42 @@ const Indexer = new class {
         const opus_frame_size = (process.env.opus_frame_size || 960) / 48; // samples / 48000 * 1000 ms
         const flac_frame_size = process.env.flac_frame_size || 4096;
 
-        // FLAC MAX, CD, AND OPUS
-        if (format == 1)
-            params = ["-f", "flac", "-i", input, "-frame_size", flac_frame_size, "-f", "flac", output];
-        else if (format == 2)
-            params = ["-f", "flac", "-i", input, "-frame_size", flac_frame_size, "-ar", "44100", "-sample_fmt", "s16", "-f", "flac", output]; // Downsample to 44.1khz, 16 bit
-        else if (format >= 3)
-            params = ["-f", "flac", "-i", input, "-c:a", "libopus", "-ar", "48000", "-b:a", "128k", "-application", "audio", "-frame_duration", opus_frame_size, "-vbr", "on", "-f", "opus", output]; // Set bitrate, frame length, type, variable bitrate and fullband
+        // Parse format data
+        // INPUT
+        let params = ["-i", input]
 
-        // OPUS BITRATES
-        if (format == 3)
-            params[9] = "256k"; // 256 kbps
-        else if (format == 4)
-            params[9] = "128k"; // 128 kbps (default)
-        else if (format == 5)
-            params[9] = "64k"; // 64 kbps
-        else if (format == 6)
-            params[9] = "24k"; // 24 kbps
+        // ENCODER (c:a, application)
+        params.push("-c:a", format.encoder);
+
+        if (format.encoder == "libopus") {
+            params.push("-application", "audio");
+            params.push("-frame_duration", opus_frame_size);
+        } else if (format.encoder == "libflac") {
+            params.push("-frame_size", flac_frame_size);
+        }
+
+        // SAMPLERATE
+        params.push("-ar", format.samplerate)
+
+        // SAMPLE_FORMAT
+        if (format.bitdepth)
+            params.push("-sample_fmt", format.bitdepth == 16 ? "s16" : "s32");
+
+        // VBR
+        if (format.vbr)
+            params.push("-vbr", format.vbr ? "on" : "off");
+
+        // BITRATE
+        if (format.bitrate)
+            params.push("-b:a", `${format.bitrate}k`);
+
+        // OUTPUT
+        if (format.encoder == "libopus")
+            params.push("-f", "opus");
+        else if (format.encoder == "libflac")
+            params.push("-f", "flac");
+        
+        params.push(output);
 
         // Be quiet!
         params.push("-loglevel", "error");
@@ -189,12 +214,17 @@ const Indexer = new class {
 
     async index_data(data, id, format) {
         // Get and parse audio data
-        const mimetype = `audio/${(format < 3) ? "flac" : "ogg"}`; // audio/flac, audio/ogg (opus)
+        let mimetype; // audio/flac, audio/ogg (opus)
+        if (format.encoder == "libflac") mimetype = "audio/flac";
+        if (format.encoder == "libopus") mimetype = "audio/ogg";
+
+        // Transcode file to frames
         const parser = new codec_parser(mimetype);
         const file_data = await this.transcode(data, format);
         let frames = parser.parseAll(file_data);
-        if (format >= 3) {
-            // Get all OpusFrame-s from the OggPage-s
+
+        // Get all OpusFrame-s from the OggPage-s
+        if (format.encoder == "libopus") {
             let opus_frames = [];
             for (let i = 0; i < frames.length; i++) {
                 for (let j = 0; j < frames[i].codecFrames.length; j++) {
@@ -205,20 +235,8 @@ const Indexer = new class {
             frames = opus_frames;
         }
 
-        // Add frames in one single transaction
-        const tot_size = database.create_track_frames(id, format, frames);
-
-        //for (let index = 0; index < num_frames; index++) {
-        //    // Get frame data
-        //    const frame_data = frames[index].data; //format <= 2 ? frames[index].data : frames[index].rawData;
-//
-        //    // Add to database
-        //    const result = database.create_track_frame(id, format, index, frame_data);
-        //    if (!result)
-        //        console.warn(`Error indexing frame data for track "${track}" [ID ${track_id}] at index #${index}.`);
-//
-        //    tot_size += frame_data.byteLength;
-        //}
+        // Add frames to database
+        const tot_size = database.add_track_frames(id, format.id, frames);
 
         return tot_size;
     }
@@ -233,7 +251,10 @@ const Indexer = new class {
             return false;
         }
 
-        // Find all .flac files here, and print out metadata.
+        // Get formats ordered by level
+        const formats = database.get_formats();
+
+        // Find all .flac files here
         const files = (await fs.readdir(directory, { withFileTypes: true, recursive: true }))
                         .filter(dirent => dirent.isFile() && dirent.name.endsWith(".flac"));
 
@@ -246,26 +267,35 @@ const Indexer = new class {
             //    continue;
 
             // Add metadata to database, skip track if failed
-            const meta_status = await this.index_meta(file);
-            if (!meta_status)
+            const meta = await this.index_meta(file);
+            if (!meta)
                 continue;
 
-            continue;
-
             // Store for the jobs
-            this.files.set(meta_status.track_id, file_path);
+            this.files.set(meta.track_id, file_path);
 
-            // Add transcoding to quality levels we need to queue of jobs
-            let start_format = meta_status.format;
-            if (start_format < this.max_format)
-                start_format = this.max_format;
+            // Transcode to minimum quality level
+            this.add_job(meta.track_id, formats[0]);
 
-            for (let format = start_format; format <= 6; format++) {
-                this.job_index++;
-                this.jobs.set(this.job_index, {
-                    track_id: meta_status.track_id,
-                    format: format
-                });
+            // Then add levels until it becomes unreasonable
+            for (let i = 1; i < formats.length; i++) {
+                continue;
+                const format = formats[i];
+                
+                if (meta.lossless >= format.lossless)
+                    continue;
+
+                if (!meta.lossless && meta.bitrate < format.bitrate)
+                    continue;
+
+                if (meta.lossless && meta.samplerate < format.samplerate)
+                    continue;
+
+                if (meta.lossless && meta.bitdepth < format.bitdepth)
+                    continue;
+
+                // Good to go
+                this.add_job(meta.track_id, formats[i]);
             }
 
             Utils.overwrite_line(`Scanned ${i} of ${files.length} files. [${(100 * i / files.length).toFixed(2)}%].`);
@@ -284,16 +314,23 @@ const Indexer = new class {
             this.check_jobs();
         
         while (this.jobs.size !== 0) {
-            // Print info
+            // Print info and wait
             Utils.overwrite_line(`Finished ${total_jobs - this.jobs.size} of ${total_jobs} jobs. [${(100 * (total_jobs - this.jobs.size) / total_jobs).toFixed(2)}%].`);
-
-            // Wait
             await Utils.wait(1000);
         }
 
         const time_end = performance.now();
         Utils.overwrite_line(`Successfully indexed ${files.length} tracks [${total_jobs} jobs] in ${((time_end - time_start) / (60 * 1000)).toFixed(2)} minutes.\n`);
 
+        return true;
+    }
+
+    add_job(track_id, format) {
+        this.job_index++;
+        this.jobs.set(this.job_index, {
+            track_id: track_id,
+            format: format
+        });
         return true;
     }
 

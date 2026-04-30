@@ -9,7 +9,9 @@ CREATE TABLE creator (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name varchar(255) NOT NULL,
     type_id TINYINT NOT NULL REFERENCES creator_type(id),
-    user_id INTEGER REFERENCES user(id)
+    user_id INTEGER REFERENCES user(id),
+
+    generated TINYINT NOT NULL
 );
 
 CREATE TABLE creator_type (
@@ -21,7 +23,9 @@ CREATE TABLE collection (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name varchar(255),
     type_id TINYINT NOT NULL REFERENCES collection_type(id),
-    creator_id INTEGER NOT NULL REFERENCES creator(id)
+    creator_id INTEGER NOT NULL REFERENCES creator(id),
+
+    generated TINYINT NOT NULL
 );
 
 CREATE TABLE collection_type (
@@ -32,6 +36,7 @@ CREATE TABLE collection_type (
 CREATE TABLE track (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name varchar(255),
+    path varchar(255),
     
     duration REAL NOT NULL,
     number INTEGER,
@@ -70,11 +75,12 @@ CREATE TABLE format (
     level INTEGER NOT NULL,
 
     encoder varchar(63),
-    lossy TINYINT NOT NULL,
+    lossless TINYINT NOT NULL,
     bitrate INTEGER,
     vbr TINYINT NOT NULL,
     samplerate INTEGER,
-    bitdepth varchar(31)
+    bitdepth INTEGER,
+    command varchar(255)
 );
 
 CREATE TABLE track_format (
@@ -97,11 +103,11 @@ CREATE TABLE track_frame (
 INSERT INTO creator_type(name) VALUES ("User"), ("Artist"), ("Duo"), ("Band");
 INSERT INTO collection_type(name) VALUES ("EP"), ("Album"), ("Playlist");
 
-INSERT INTO format(name, level, lossy, vbr, bitrate, samplerate, bitdepth, encoder) VALUES
-("FLAC Max",     3, 0, 0, null, 96000, "s32", "flac"),
-("FLAC HD",      2, 0, 0, null, 48000, "s32", "flac"),
-("FLAC CD",      1, 0, 0, null, 44100, "s16", "flac"),
-("Opus Max",     0, 1, 1, 384,  48000,  null, "libopus"),
-("Opus High",   -1, 1, 1, 192,  48000,  null, "libopus"),
-("Opus Medium", -2, 1, 1, 96,   48000,  null, "libopus"),
-("Opus Low",    -3, 1, 1, 48,   48000,  null, "libopus");
+INSERT INTO format(name, level, lossless, vbr, bitrate, samplerate, bitdepth, encoder) VALUES
+("FLAC Max",     3, 1, 0, null, 96000, 24,   "libflac"),
+("FLAC HD",      2, 1, 0, null, 48000, 24,   "libflac"),
+("FLAC CD",      1, 1, 0, null, 44100, 16,   "libflac"),
+("Opus Max",     0, 0, 1, 384,  48000, null, "libopus"),
+("Opus High",   -1, 0, 1, 192,  48000, null, "libopus"),
+("Opus Medium", -2, 0, 1, 96,   48000, null, "libopus"),
+("Opus Low",    -3, 0, 1, 48,   48000, null, "libopus");

@@ -4,7 +4,7 @@
 import * as database from "./database.js";
 
 // Returns ID of creator, either new or pre-existing
-export function creator(name, type) {
+export function creator(name, type, generated) {
     // Get creator first
     let creator = database.get_creator_name(name);
     if (creator)
@@ -17,13 +17,13 @@ export function creator(name, type) {
         creator_type = { id: database.add_creator_type(type) };
 
     // Add creator
-    creator = { id: database.add_creator(name, creator_type.id) };
+    creator = { id: database.add_creator(name, creator_type.id, generated) };
 
     return creator.id;
 }
 
 // Returns ID of collection, either new or pre-existing
-export function collection(name, type, creator_id) {
+export function collection(name, type, creator_id, generated) {
     // Get collection first
     let collection = database.get_collection_name(name, creator_id);
     if (collection)
@@ -40,7 +40,7 @@ export function collection(name, type, creator_id) {
         collection_type = { id: database.add_collection_type(type) };
 
     // Add collection
-    collection = { id: database.add_collection(name, creator_id, collection_type.id) };
+    collection = { id: database.add_collection(name, creator_id, collection_type.id, generated) };
 
     return collection.id;
 }
@@ -58,7 +58,7 @@ export function genre(name) {
     return genre.id;
 }
 
-export function new_track(name, number, disc, duration, released, collection_id, creators, genres) {
+export function track(name, number, disc, duration, released, collection_id, creators, genres) {
     // Validate collection
     if (!database.get_collection_id(collection_id))
         return false;
@@ -72,11 +72,10 @@ export function new_track(name, number, disc, duration, released, collection_id,
     // Add / get creator-s
     let creator_ids = [];
     for (let i = 0; i < creators.length; i++) {
-        creator_ids.push(creator(creators[i], "Artist")); // Default type artist. If creator already exists it is not modified.
+        creator_ids.push(creator(creators[i], "artist", true)); // Default type artist. If creator already exists it is not modified.
     }
 
     // Add track_creator-s
-    console.log(creator_ids)
     database.track_creators(track_id, creator_ids);
 
     // Add / get genre-s
@@ -86,7 +85,6 @@ export function new_track(name, number, disc, duration, released, collection_id,
     }
 
     // Add track_genres
-    console.log(genre_ids)
     database.track_genres(track_id, genre_ids);
 
     return track_id;
