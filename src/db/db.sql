@@ -104,9 +104,9 @@ INSERT INTO creator_type(name) VALUES ("User"), ("Artist"), ("Duo"), ("Band");
 INSERT INTO collection_type(name) VALUES ("EP"), ("Album"), ("Playlist");
 
 INSERT INTO format(name, level, lossless, vbr, bitrate, samplerate, bitdepth, encoder) VALUES
-("FLAC Max",     3, 1, 0, null, 96000, 24,   "libflac"),
-("FLAC HD",      2, 1, 0, null, 48000, 24,   "libflac"),
-("FLAC CD",      1, 1, 0, null, 44100, 16,   "libflac"),
+("FLAC Max",     3, 1, 0, null, 96000, 24,   "flac"),
+("FLAC HD",      2, 1, 0, null, 48000, 24,   "flac"),
+("FLAC CD",      1, 1, 0, null, 44100, 16,   "flac"),
 ("Opus Max",     0, 0, 1, 384,  48000, null, "libopus"),
 ("Opus High",   -1, 0, 1, 192,  48000, null, "libopus"),
 ("Opus Medium", -2, 0, 1, 96,   48000, null, "libopus"),

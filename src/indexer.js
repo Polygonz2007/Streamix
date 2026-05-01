@@ -129,7 +129,7 @@ const Indexer = new class {
         if (format.encoder == "libopus") {
             params.push("-application", "audio");
             params.push("-frame_duration", opus_frame_size);
-        } else if (format.encoder == "libflac") {
+        } else if (format.encoder == "flac") {
             params.push("-frame_size", flac_frame_size);
         }
 
@@ -151,7 +151,7 @@ const Indexer = new class {
         // OUTPUT
         if (format.encoder == "libopus")
             params.push("-f", "opus");
-        else if (format.encoder == "libflac")
+        else if (format.encoder == "flac")
             params.push("-f", "flac");
         
         params.push(output);
@@ -215,7 +215,7 @@ const Indexer = new class {
     async index_data(data, id, format) {
         // Get and parse audio data
         let mimetype; // audio/flac, audio/ogg (opus)
-        if (format.encoder == "libflac") mimetype = "audio/flac";
+        if (format.encoder == "flac") mimetype = "audio/flac";
         if (format.encoder == "libopus") mimetype = "audio/ogg";
 
         // Transcode file to frames
@@ -279,10 +279,10 @@ const Indexer = new class {
 
             // Then add levels until it becomes unreasonable
             for (let i = 1; i < formats.length; i++) {
-                continue;
                 const format = formats[i];
                 
-                if (meta.lossless >= format.lossless)
+                // Check quality level against current format
+                if (meta.lossless < format.lossless)
                     continue;
 
                 if (!meta.lossless && meta.bitrate < format.bitrate)
