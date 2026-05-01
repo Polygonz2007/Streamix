@@ -32,7 +32,6 @@ const Indexer = new class {
 
         // Indexing
         this.jobs = new Map(); // Job index -> Track id and format
-        this.files = new Map(); // Track id -> path
         this.file_data = new Map(); // Track id -> Uint8Buf
         this.job_index = 0; // Increments
         this.threads = 0;
@@ -57,7 +56,7 @@ const Indexer = new class {
         // Check if we have read file. If not, read it into file data
         let file_data = this.file_data.get(params.track_id);
         if (!file_data) {
-            const path = this.files.get(params.track_id);
+            const path = database.get_track_id(params.track_id).path;
             this.file_data.set(params.track_id, await fs.readFile(path));
         }
 
@@ -71,10 +70,8 @@ const Indexer = new class {
         });
 
         // Remove usued file data
-        if (jobs_with_file == 0) {
-            this.files.delete(params.track_id);
+        if (jobs_with_file == 0)
             this.file_data.delete(params.track_id);
-        }
 
         // Keep the chain going
         this.check_jobs();
@@ -94,15 +91,16 @@ const Indexer = new class {
         if (data.common.track.of == 1)
             collection_type = "single";
 
-        const creator_id = dbi.creator(data.common.albumartist || data.common.artists[0], creator_type, true);
-        const collection_id = dbi.collection(data.common.album, collection_type, creator_id, true);
-        const track_id = dbi.track(data.common.title, data.common.track.no, data.common.disk.no, data.format.duration, data.common.releasedate, collection_id, data.common.artists || [], data.common.genre || []);
+        const creator = dbi.creator(data.common.albumartist || data.common.artists[0], creator_type, true);
+        const collection = dbi.collection(data.common.album, collection_type, creator.id, true);
+        const track = dbi.track(data.common.title, data.common.track.no, data.common.disk.no, data.format.duration, data.common.date, collection.id, data.common.artists || [], data.common.genre || [], file_path);
 
         // Later add more data
         return {
-            creator_id: creator_id,
-            collection_id: collection_id,
-            track_id: track_id,
+            creator_id: creator.id,
+            collection_id: collection.id,
+            track_id: track.id,
+            new: track.new,
 
             lossless: data.format.lossless,
             samplerate: data.format.sampleRate,
@@ -212,7 +210,7 @@ const Indexer = new class {
         return arrbuf;
     }
 
-    async index_data(data, id, format) {
+    async index_data(data, track_id, format) {
         // Get and parse audio data
         let mimetype; // audio/flac, audio/ogg (opus)
         if (format.encoder == "flac") mimetype = "audio/flac";
@@ -236,7 +234,8 @@ const Indexer = new class {
         }
 
         // Add frames to database
-        const tot_size = database.add_track_frames(id, format.id, frames);
+        const tot_size = database.add_track_frames(track_id, format.id, frames);
+        dbi.track_format(track_id, format.id, true, true);
 
         return tot_size;
     }
@@ -262,43 +261,48 @@ const Indexer = new class {
             const file = files[i];
             const file_path = path.join(file.parentPath, file.name);
 
-            // Check that we have not parsed this before
-            //if (database.get_track_by_path(file_path))
-            //    continue;
-
             // Add metadata to database, skip track if failed
             const meta = await this.index_meta(file);
             if (!meta)
                 continue;
-
-            // Store for the jobs
-            this.files.set(meta.track_id, file_path);
-
+            
             // Transcode to minimum quality level
-            this.add_job(meta.track_id, formats[0]);
+            dbi.track_format(meta.track_id, formats[0].id, false, false); // Will not change if it already exists
 
             // Then add levels until it becomes unreasonable
             for (let i = 1; i < formats.length; i++) {
                 const format = formats[i];
-                
+
                 // Check quality level against current format
                 if (meta.lossless < format.lossless)
                     continue;
-
+                
                 if (!meta.lossless && meta.bitrate < format.bitrate)
                     continue;
 
-                if (meta.lossless && meta.samplerate < format.samplerate)
+                if (meta.lossless && format.lossless && meta.samplerate < format.samplerate)
                     continue;
 
-                if (meta.lossless && meta.bitdepth < format.bitdepth)
+                if (meta.lossless && format.lossless && meta.bitdepth < format.bitdepth)
                     continue;
 
                 // Good to go
-                this.add_job(meta.track_id, formats[i]);
+                dbi.track_format(meta.track_id, formats[i].id, false, false);
             }
 
             Utils.overwrite_line(`Scanned ${i} of ${files.length} files. [${(100 * i / files.length).toFixed(2)}%].`);
+        }
+
+        // Create jobs based off database and start working
+        const track_formats = database.get_track_format_by_ready(false);
+        const format_map = new Map();
+        for (let i = 0; i < formats.length; i++) {
+            format_map.set(formats[i].id, formats[i]);
+        }
+
+        for (let i = 0; i < track_formats.length; i++) {
+            const track_format = track_formats[i];
+            this.add_job(track_format.track_id, format_map.get(track_format.format_id));
         }
 
         // If no jobs, say so
@@ -306,15 +310,11 @@ const Indexer = new class {
         if (total_jobs == 0)
             return;
 
-        // Start indexing of everything and log progress (setInterval, overwrite same line, with progress of jobs)
-        Utils.overwrite_line(`Found ${this.files.size} tracks for indexing.`);
-
-        // Start
+        // Complete all the jobs
         for (let i = 0; i < this.max_threads; i++)
             this.check_jobs();
         
         while (this.jobs.size !== 0) {
-            // Print info and wait
             Utils.overwrite_line(`Finished ${total_jobs - this.jobs.size} of ${total_jobs} jobs. [${(100 * (total_jobs - this.jobs.size) / total_jobs).toFixed(2)}%].`);
             await Utils.wait(1000);
         }

@@ -61,8 +61,8 @@ export function add_creator(name, type_id, generated) {
 
 export function get_creator_id(id) {
     // Insert
-    const insert = db.prepare("SELECT * FROM creator WHERE creator.id = $id");
-    const result = insert.get({
+    const select = db.prepare("SELECT * FROM creator WHERE creator.id = $id");
+    const result = select.get({
         $id: id
     });
 
@@ -71,8 +71,8 @@ export function get_creator_id(id) {
 
 export function get_creator_name(name) {
     // Insert
-    const insert = db.prepare("SELECT * FROM creator WHERE creator.name = $name");
-    const result = insert.get({
+    const select = db.prepare("SELECT * FROM creator WHERE creator.name = $name");
+    const result = select.get({
         $name: name
     });
 
@@ -92,8 +92,8 @@ export function add_creator_type(name) {
 
 export function get_creator_type_name(name) {
     // Insert
-    const insert = db.prepare("SELECT * FROM creator_type WHERE creator_type.name = $name");
-    const result = insert.get({
+    const select = db.prepare("SELECT * FROM creator_type WHERE creator_type.name = $name");
+    const result = select.get({
         $name: name
     });
 
@@ -129,8 +129,8 @@ export function add_collection(name, creator_id, type_id, generated) {
 
 export function get_collection_id(id) {
     // Insert
-    const insert = db.prepare("SELECT * FROM collection WHERE collection.id = $id");
-    const result = insert.get({
+    const select = db.prepare("SELECT * FROM collection WHERE collection.id = $id");
+    const result = select.get({
         $id: id
     });
 
@@ -139,8 +139,8 @@ export function get_collection_id(id) {
 
 export function get_collection_name(name, creator_id) {
     // Insert
-    const insert = db.prepare("SELECT * FROM collection WHERE collection.name = $name AND collection.creator_id = $creator_id");
-    const result = insert.get({
+    const select = db.prepare("SELECT * FROM collection WHERE collection.name = $name AND collection.creator_id = $creator_id");
+    const result = select.get({
         $name: name,
         $creator_id: creator_id
     });
@@ -161,8 +161,8 @@ export function add_collection_type(name) {
 
 export function get_collection_type_name(name) {
     // Insert
-    const insert = db.prepare("SELECT * FROM collection_type WHERE collection_type.name = $name");
-    const result = insert.get({
+    const select = db.prepare("SELECT * FROM collection_type WHERE collection_type.name = $name");
+    const result = select.get({
         $name: name
     });
 
@@ -182,8 +182,8 @@ export function add_genre(name) {
 
 export function get_genre_name(name) {
     // Insert
-    const insert = db.prepare("SELECT * FROM genre WHERE genre.name = $name");
-    const result = insert.get({
+    const select = db.prepare("SELECT * FROM genre WHERE genre.name = $name");
+    const result = select.get({
         $name: name
     });
 
@@ -191,18 +191,42 @@ export function get_genre_name(name) {
 }
 
 // TRACK
-export function add_track(name, number, disc, duration, released) {
+export function add_track(name, number, disc, duration, released, path) {
     // Insert
-    const insert = db.prepare("INSERT INTO track(name, number, disc, duration, released) VALUES ($name, $number, $disc, $duration, $released)");
+    const insert = db.prepare("INSERT INTO track(name, number, disc, duration, released, path) VALUES ($name, $number, $disc, $duration, $released, $path)");
     const result = insert.run({
         $name: name,
         $number: number,
         $disc: disc,
         $duration: duration,
-        $released: released
+        $released: released,
+        $path: path
     });
 
     return result.lastInsertRowid;
+}
+
+export function get_track_name(name, collection_id) {
+    // Get
+    const select = db.prepare(`SELECT * FROM track
+                               INNER JOIN track_collection ON track.id = track_collection.track_id
+                               INNER JOIN collection ON track_collection.collection_id = collection.id
+                               WHERE track.name = $name AND collection.id = $collection_id`);
+    
+    const result = select.get({
+        $name: name,
+        $collection_id: collection_id
+    });
+
+    return result;
+}
+
+export function get_track_id(id) {
+    // Get
+    const select = db.prepare(`SELECT * FROM track WHERE id = $id`);
+    const result = select.get({ $id: id });
+
+    return result;
 }
 
 // TRACK_GENRE
@@ -284,7 +308,67 @@ export function add_track_collection(track_id, collection_id, position) {
 }
 
 // TRACK_FORMAT
+export function add_track_format(track_id, format_id, ready) {
+    // Insert
+    const insert = db.prepare("INSERT INTO track_format(track_id, format_id, ready) VALUES ($track_id, $format_id, $ready)");
+    const result = insert.run({
+        $track_id: track_id, 
+        $format_id: format_id,
+        $ready: ready
+    });
 
+    return result.lastInsertRowid;
+}
+
+export function update_track_format_ready(track_id, format_id, ready) {
+    // Update
+    const insert = db.prepare("UPDATE track_format SET ready = $ready WHERE track_id = $track_id AND format_id = $format_id");
+    const result = insert.run({
+        $track_id: track_id, 
+        $format_id: format_id,
+        $ready: ready
+    });
+
+    return true;
+}
+
+export function get_track_format(track_id, format_id) {
+    // Insert
+    const select = db.prepare(`SELECT * FROM track_format WHERE track_id = $track_id AND format_id = $format_id`);
+    const result = select.get({
+        $track_id: track_id,
+        $format_id: format_id
+    });
+
+    return result;
+}
+
+export function get_track_format_by_ready(ready) {
+    // Get
+    const select = db.prepare(`SELECT * FROM track_format WHERE track_format.ready = $ready`);
+    const result = select.all({ $ready: ready });
+
+    return result;
+}
+
+// Returns the highest format level track has
+export function get_track_format_by_level(track_id, level) {
+    // Get
+    const select = db.prepare(`SELECT format.* FROM track
+                               INNER JOIN track_format ON track_format.track_id = track.id
+                               INNER JOIN format ON track_format.format_id = format.id
+                               WHERE track.id = $track_id
+                               AND format.level <= $level
+                               AND track_format.ready = 1
+                               ORDER BY level DESC
+                               LIMIT 1`);
+    const result = select.get({
+        $track_id: track_id,
+        $level: level
+    });
+
+    return result;
+}
 
 // TRACK_FRAME
 export function add_track_frames(track_id, format_id, frames) {
@@ -314,11 +398,24 @@ export function add_track_frames(track_id, format_id, frames) {
     return result;
 }
 
+export function get_track_frames(track_id, format_id, start_index, num) {
+    // Get
+    const select = db.prepare("SELECT * FROM track_frame WHERE track_id = $track_id AND format_id = $format_id AND id >= $start_index LIMIT $num");
+    const result = select.all({
+        $track_id: track_id,
+        $format_id: format_id,
+        $start_index: start_index,
+        $num: num
+    });
+
+    return result;
+}
+
 // FORMAT
 export function get_formats() {
-    // Insert
-    const insert = db.prepare("SELECT * FROM format ORDER BY format.level ASC");
-    const result = insert.all();
+    // Get
+    const select = db.prepare("SELECT * FROM format ORDER BY format.level ASC");
+    const result = select.all();
 
     return result;
 }
