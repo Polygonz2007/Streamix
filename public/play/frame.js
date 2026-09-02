@@ -3,11 +3,10 @@ import Comms from "/comms.js";
 import Stream from "./stream.js";
 
 const Frame = class {
-    constructor(track_id, group_id, format, sample_rate, index) {
+    constructor(track_id, group_id, format, index) {
         this.track_id = track_id;
         this.group_id = group_id;
         this.format = format;
-        this.sample_rate = sample_rate;
         this.index = index;
 
         this.data; // The data (raw)
@@ -17,8 +16,10 @@ const Frame = class {
 
         this.ready = false;
         this.done = false;
-        this.start_time;
-        this.end_time;
+
+        this.time = {};
+        this.time.start = null;
+        this.time.end = null;
     }
 
     /// PUBLIC FUNCTIONS ///
@@ -26,13 +27,11 @@ const Frame = class {
     // Fetch data for this frame.
     async fetch() {
         // Fetch
-        const data = await Comms.ws_req({
-            type: 0 // get buffer
-        });
+        const data = await Comms.get_frame(this.index);
 
         // Don't explode if no data
         if (!data) return false;
-        this.data = data;
+        this.data = data.data;
 
         return true;
     }
@@ -47,6 +46,12 @@ const Frame = class {
         if (this.buffer.error)
             return;
 
+        delete this.data; // Don't waste space
+
+        // temp
+        if (this.buffer.channelData[0][0] == 0 && this.buffer.channelData[1][100] == 0)
+            this.error = true;
+
         // Create source
         this.source = await this.#create_source();
         if (!this.source)
@@ -55,29 +60,32 @@ const Frame = class {
         // Add event for ending
         this.source.addEventListener("ended", () => {
             this.done = true;
+            Stream.check_buffer();
         });
 
-        this.duration = this.buffer.samplesDecoded / this.sample_rate;
+        this.duration = this.format.frame_size / this.format.samplerate;
         this.ready = true;
+
         return true;
     }
     
     // Sets the frame to start playing at this time (ovverrides any old time)
     start(time) {
-        this.start_time = time;
-        this.source.start(this.start_time);
+        this.time.start = time;
+        this.time.end = time + this.duration;
+        this.source.start(this.time.start);
     }
 
     // If time is present, frame stops playing at that time (if it is already playing)
     // Otherwise, frame gets removed immediatley
     stop(time) {
-        this.end_time = time;
+        this.time.end = time;
         
         // Start at same time but end at the cancel time
-        if (time) this.source.start(this.start_time, this.end_time);
+        if (time) this.source.start(this.time.start, this.time.end);
 
         // Else, kill it immediatley
-        this.source.stop();
+        this.source.stop(0);
         this.source.disconnect();
         this.done = true;
     }
@@ -86,31 +94,30 @@ const Frame = class {
 
     /// PRIVATE FUNCTIONS ///
     async #decode() {
-        const frame = new Uint8Array(this.data, 2);
-
-        // Decode data
-        if (this.format <= 2) {
+        if (this.format.encoder == "flac") {
             // FLAC
             if (!Stream.decoders.flac.ready) return false;
-            return await Stream.decoders.flac.decodeFrames([frame]); // Does not have decodeFrame for some reason..
-        } else if (this.format <= 6) {
+            return await Stream.decoders.flac.decodeFrames([this.data]);
+        }
+        
+        if (this.format.encoder == "libopus") {
             // OPUS
             if (!Stream.decoders.opus.ready) return false;
-            return await Stream.decoders.opus.decodeFrames([frame]);
-        } else {
-            return false;
+            return await Stream.decoders.opus.decodeFrames([this.data]);
         }
+
+        return false;
     }
 
     async #create_source() {
-        const samples = Stream.format_sample_size(this.format);
-        const buffer = Stream.context.createBuffer(2, samples, this.sample_rate);
+        const samples = this.buffer.samplesDecoded;
+        const buffer = Stream.context.createBuffer(2, samples, this.format.samplerate);
 
         // Fill the buffer with the data
         for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
-            const nowBuffering = buffer.getChannelData(channel);
-            for (let i = 0; i < this.buffer.samplesDecoded; i++) {
-                nowBuffering[i] = this.buffer.channelData[channel][i];
+            const buffering = buffer.getChannelData(channel);
+            for (let i = 0; i < samples; i++) {
+                buffering[i] = this.buffer.channelData[channel][i];
             }
         }
 

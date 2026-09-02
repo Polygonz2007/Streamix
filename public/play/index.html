@@ -12,8 +12,6 @@
         <link rel="stylesheet" href="/layout.css">
 
         <!-- Page specific CSS -->
-        <link rel="stylesheet" href="/style.css">
-        <link rel="stylesheet" href="/trackbox.css">
         <link rel="stylesheet" href="./style.css">
 
         <!-- PWA Manifest -->
@@ -35,12 +33,34 @@
             <h2 id="time1">Global Time / Track Time</h2>
             <h2 id="time2">Time Offset / Delay Offset</h2>
             <br>
-            <h2 if="buffer">Buffer Health: ?</h2>
+            <h2 id="buffer">Buffer Health: ?</h2>
             <h2 id="quality">[format] @ [samplerate] hz</h2>
+            <br>
+            <h2 id="frame">Frame: #0000</h2>
+
+            <div>
+                <button onclick="window.stream.set_state(null, -3, null)">Opus Low</button>
+                <button onclick="window.stream.set_state(null, -2, null)">Opus Medium</button>
+                <button onclick="window.stream.set_state(null, -1, null)">Opus High</button>
+                <button onclick="window.stream.set_state(null, 0, null)">Opus Max</button>
+                <button onclick="window.stream.set_state(null, 1, null)">FLAC CD</button>
+                <button onclick="window.stream.set_state(null, 2, null)">FLAC HD</button>
+                <button onclick="window.stream.set_state(null, 3, null)">FLAC Max</button>
+            </div>
         </div>
 
         <canvas id="frame-debug"></canvas>
-        <p id="queue"></p>
+
+        <div id="library">
+            <div id="search">
+                <input type="text" placeholder="Search on Streamix" />
+            </div>
+            <div id="results"></div>
+        </div>
+        
+        <div id="queue">
+            
+        </div>
 
         <div id="controls" class="">
             <div id="seekbar-container">
@@ -72,8 +92,8 @@
         <script type="module" src="./queue.js"></script>
         <script type="module" src="./display.js"></script>
         <script type="module" src="./debug.js"></script>
-        <!--<script type="module" src="/library.js"></script>
-        <script type="module" src="/ui.js"></script>
+        <script type="module" src="./library.js"></script>
+        <!--<script type="module" src="/ui.js"></script>
         <script type="module" src="/stream.js"></script>-->
     </body>
 </html>

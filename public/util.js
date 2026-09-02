@@ -38,6 +38,24 @@ const Utils = new class {
         if (upper) string = string.toUpperCase();
         return string;
     }
+
+    number_to_readable_string(number) {
+        let result = "";
+        const nstring = number.toString();
+
+        let c = 0;
+        for (let i = nstring.length - 1; i >= 0; i--) {
+            result = nstring[i] + result;
+            c++;
+            if (c >= 3) {
+                console.log("h")
+                result = " " + result;
+                c = 0;
+            }
+        }
+
+        return result;
+    }
 }
 
 export default Utils;

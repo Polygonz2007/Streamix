@@ -1,7 +1,7 @@
 
 import Settings from "./settings.js";
 import Queue from "./queue.js";
-// import track object
+// import item object
 import Stream from "./stream.js";
 import Display from "./display.js";
 
@@ -9,8 +9,8 @@ const Controller = new class {
     constructor() {
         /// PLAYBACK ///
         this._playing = false;
-        this.autoplay = true; // Go to next track when previous is done
-        this.track;
+        this.autoplay = true; // Go to next item when previous is done
+        this.item;
 
         /// INPUT ///
         this.buttons = {
@@ -54,70 +54,77 @@ const Controller = new class {
         document.querySelector("body").style.backgroundColor = this.playing ? "#121" : "#111";
     }
 
-    play(track) {
-        // Handle tracks not existing
-        if (!track && this.track) {
-            Display.clear_track();
-            this.track = undefined;
+    async play(item) {
+        // Handle items not existing
+        if (!item && this.item) {
+            Display.clear_item();
+            this.item = undefined;
             this.playing = false;
             return;
-        } else if (!track && !this.track) {
-            if (Queue.tracks.length == 0)
+        } else if (!item && !this.item) {
+            if (Queue.items.length == 0)
                 return;
 
-            track = Queue.tracks[0];
+            item = Queue.items[0];
         }
 
-        this.track = track;
+        this.item = item;
 
-        // Not tweak out when track hasnt loaded
-        if (!track.loaded) {
+        // Not tweak out when item hasnt loaded
+        if (!item.loaded) {
             this.playing = false;
-            Display.error("Track not loaded");
+            Display.error("item not loaded");
             return;
         }
 
+        const { group_id } = await Stream.set_state(this.item.id, null, 0);
+        Stream.time_offset += (Stream.time - Stream.time_offset);
+        Stream.keep_group(group_id);
+        Stream.context.resume();
         this.playing = true;
-        Stream.track_id = this.track.track_id;
-        //Stream.test();
-        // STREAM TELL STREAM TO DO STUFF HERE
 
-        Display.set_track(track);
+        Display.set_item(item);
 
         // debug
-        document.querySelector("#queue-info").innerHTML = `${track.index + 1} / ${Queue.tracks.length}`
+        document.querySelector("#queue-info").innerHTML = `${item.index + 1} / ${Queue.items.length}`
     }
 
-    pause() {
-        if (this.track) {
+    async pause() {
+        if (this.item) {
             this.playing = !this.playing;
+            if (this.playing)
+                Stream.context.resume();
+            else
+                Stream.context.suspend();
+            
             return;
         }
 
-        if (Queue.tracks.length > 0)
-            this.play(Queue.tracks[0]);
+        if (Queue.items.length > 0)
+            this.play(Queue.items[0]);
     }
 
-    previous() {
-        if (!this.track) {
-            this.play(Queue.tracks[Queue.tracks.length - 1]); // Play last
+    async previous() {
+        if (!this.item) {
+            this.play(Queue.items[Queue.items.length - 1]); // Play last
         } else {
-            this.play(Queue.tracks[this.track.index - 1]); // Play previous
+            this.play(Queue.items[this.item.index - 1]); // Play previous
         }
 
         
     }
 
-    next() {
-        if (!this.track) {
-            this.play(Queue.tracks[0]); // Play first
+    async next() {
+        if (!this.item) {
+            this.play(Queue.items[0]); // Play first
         } else {
-            this.play(Queue.tracks[this.track.index + 1]); // Play next
+            this.play(Queue.items[this.item.index + 1]); // Play next
         }
     }
 
-    goto(index) {
-
+    async goto(index) {
+        if (index > 0 && index < Queue.items.length)
+            this.play(Queue.items[index]);
     }
 }
 

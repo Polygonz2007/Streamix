@@ -1,6 +1,7 @@
 
 // Handles database interaction on a low level.
 
+import Utils from "../util.js";
 import Stats from "../stats.js";
 import fs from "fs";
 
@@ -33,12 +34,13 @@ export function open() {
             throw new Error("Database could net be set up properly. Aborting!");
         }
     
-        console.log("Database sucessfully created.");
+        Utils.overwrite_line("Database created.\n");
     }
 
     if (!db) {
         db = new Database(process.env.db_path);
         db.run("PRAGMA journal_mode = WAL;");
+        console.log("Database loaded.");
     }
     
     return true;
@@ -114,13 +116,14 @@ export function add_creator_image(creator_id, level, image) {
 }
 
 // COLLECTION
-export function add_collection(name, creator_id, type_id, generated) {
+export function add_collection(name, creator_id, type_id, image, generated) {
     // Insert
-    const insert = db.prepare("INSERT INTO collection(name, creator_id, type_id, generated) VALUES ($name, $creator_id, $type_id, $generated)");
+    const insert = db.prepare("INSERT INTO collection(name, creator_id, type_id, image, generated) VALUES ($name, $creator_id, $type_id, $image, $generated)");
     const result = insert.run({
         $name: name,
         $creator_id: creator_id,
         $type_id: type_id,
+        $image: image,
         $generated: generated
     });
 
@@ -128,8 +131,8 @@ export function add_collection(name, creator_id, type_id, generated) {
 }
 
 export function get_collection_id(id) {
-    // Insert
-    const select = db.prepare("SELECT * FROM collection WHERE collection.id = $id");
+    // Select
+    const select = db.prepare("SELECT id, name, creator_id, type_id, collection.image IS NOT NULL as has_image, generated FROM collection WHERE collection.id = $id");
     const result = select.get({
         $id: id
     });
@@ -138,11 +141,32 @@ export function get_collection_id(id) {
 }
 
 export function get_collection_name(name, creator_id) {
-    // Insert
-    const select = db.prepare("SELECT * FROM collection WHERE collection.name = $name AND collection.creator_id = $creator_id");
+    // Select
+    const select = db.prepare("SELECT id, name, creator_id, type_id, collection.image IS NOT NULL as has_image, generated FROM collection WHERE collection.name = $name AND collection.creator_id = $creator_id");
     const result = select.get({
         $name: name,
         $creator_id: creator_id
+    });
+
+    return result;
+}
+
+export function get_collection_image(collection_id) {
+    // Select
+    const select = db.prepare("SELECT image FROM collection WHERE collection.id = $collection_id");
+    const result = select.get({
+        $collection_id: collection_id
+    });
+
+    return result;
+}
+
+export function update_collection_image(collection_id, image) {
+    // Update
+    const update = db.prepare("UPDATE collection SET image = $image WHERE collection.id = $collection_id");
+    const result = update.run({
+        $collection_id: collection_id,
+        $image: image
     });
 
     return result;
@@ -209,9 +233,8 @@ export function add_track(name, number, disc, duration, released, path) {
 export function get_track_name(name, collection_id) {
     // Get
     const select = db.prepare(`SELECT * FROM track
-                               INNER JOIN track_collection ON track.id = track_collection.track_id
-                               INNER JOIN collection ON track_collection.collection_id = collection.id
-                               WHERE track.name = $name AND collection.id = $collection_id`);
+                               INNER JOIN item ON track.id = item.track_id
+                               WHERE track.name = $name AND item.collection_id = $collection_id`);
     
     const result = select.get({
         $name: name,
@@ -229,18 +252,27 @@ export function get_track_id(id) {
     return result;
 }
 
+export function get_track_item(id) {
+    // Get
+    const select = db.prepare(`SELECT track.* FROM track INNER JOIN item ON item.track_id = track.id WHERE item.id = $id`);
+    const result = select.get({ $id: id });
+
+    return result;
+}
+
+
 // TRACK_GENRE
-export function track_genres(track_id, genre_ids) {
+export function track_genres(track_id, genres) {
     // Get or insert
     const select = db.prepare("SELECT * FROM track_genre WHERE track_id = $track_id AND genre_id = $genre_id");
     const insert = db.prepare("INSERT INTO track_genre(track_id, genre_id) VALUES ($track_id, $genre_id)");
 
-    const result = db.transaction((track_id, genre_ids) => {
+    const result = db.transaction((track_id, genres) => {
         let ids = [];
-        for (let i = 0; i < genre_ids.length; i++) {
+        for (let i = 0; i < genres.length; i++) {
             const data = {
                 $track_id: track_id,
-                $genre_id: genre_ids[i]
+                $genre_id: genres[i].id
             };
 
             // Try to get first
@@ -255,24 +287,33 @@ export function track_genres(track_id, genre_ids) {
         }
 
         return ids;
-    })(track_id, genre_ids);
+    })(track_id, genres);
 
     return result;
 }
 
+export function get_track_genres(track_id) {
+    // Get
+    const select = db.prepare(`SELECT genre.* FROM track_genre
+                               INNER JOIN genre ON track_genre.genre_id = genre.id
+                               WHERE track_id = $track_id`);
+    const result = select.all({ $track_id: track_id });
+    
+    return result;
+}
 
 // TRACK_CREATOR
-export function track_creators(track_id, creator_ids) {
+export function track_creators(track_id, creators) {
     // Get or insert
     const select = db.prepare("SELECT * FROM track_creator WHERE track_id = $track_id AND creator_id = $creator_id");
     const insert = db.prepare("INSERT INTO track_creator(track_id, creator_id) VALUES ($track_id, $creator_id)");
 
-    const result = db.transaction((track_id, creator_ids) => {
+    const result = db.transaction((track_id, creators) => {
         let ids = [];
-        for (let i = 0; i < creator_ids.length; i++) {
+        for (let i = 0; i < creators.length; i++) {
             const data = {
                 $track_id: track_id,
-                $creator_id: creator_ids[i]
+                $creator_id: creators[i].id
             };
 
             // Try to get first
@@ -287,17 +328,27 @@ export function track_creators(track_id, creator_ids) {
         }
 
         return ids;
-    })(track_id, creator_ids);
+    })(track_id, creators);
 
     return result;
 }
 
-// TRACK_COLLECTION
-export function add_track_collection(track_id, collection_id, position) {
+export function get_track_creators(track_id) {
+    // Get
+    const select = db.prepare(`SELECT creator.* FROM track_creator
+                               INNER JOIN creator ON track_creator.creator_id = creator.id
+                               WHERE track_id = $track_id`);
+    const result = select.all({ $track_id: track_id });
+    
+    return result;
+}
+
+// ITEM
+export function add_item(track_id, collection_id, position) {
     // TODO: Add checks so multiple tracks cant have same position
 
     // Insert
-    const insert = db.prepare("INSERT INTO track_collection(track_id, collection_id, position) VALUES ($track_id, $collection_id, $position)");
+    const insert = db.prepare("INSERT INTO item(track_id, collection_id, position) VALUES ($track_id, $collection_id, $position)");
     const result = insert.run({
         $track_id: track_id, 
         $collection_id: collection_id,
@@ -305,6 +356,25 @@ export function add_track_collection(track_id, collection_id, position) {
     });
 
     return result.lastInsertRowid;
+}
+
+export function get_item_id(item_id) {
+    // Get
+    const select = db.prepare(`SELECT * FROM item WHERE id = $item_id`);
+    const result = select.get({ $item_id: item_id });
+    
+    return result;
+}
+
+export function get_item_track_collection(track_id, collection_id) {
+    // Get
+    const select = db.prepare(`SELECT * FROM item WHERE track_id = $track_id AND collection_id = $collection_id`);
+    const result = select.get({
+        $track_id: track_id,
+        $collection_id: collection_id
+    });
+    
+    return result;
 }
 
 // TRACK_FORMAT
@@ -322,8 +392,8 @@ export function add_track_format(track_id, format_id, ready) {
 
 export function update_track_format_ready(track_id, format_id, ready) {
     // Update
-    const insert = db.prepare("UPDATE track_format SET ready = $ready WHERE track_id = $track_id AND format_id = $format_id");
-    const result = insert.run({
+    const update = db.prepare("UPDATE track_format SET ready = $ready WHERE track_id = $track_id AND format_id = $format_id");
+    const result = update.run({
         $track_id: track_id, 
         $format_id: format_id,
         $ready: ready
@@ -367,7 +437,27 @@ export function get_track_format_by_level(track_id, level) {
         $level: level
     });
 
-    return result;
+    if (result)
+        return result;
+
+    // If level too low, pick the lowest format
+    const select_lowest = db.prepare(`SELECT format.* FROM track
+                            INNER JOIN track_format ON track_format.track_id = track.id
+                            INNER JOIN format ON track_format.format_id = format.id
+                            WHERE track.id = $track_id
+                            AND track_format.ready = 1
+                            ORDER BY level ASC
+                            LIMIT 1`);
+    const result_lowest = select_lowest.get({
+        $track_id: track_id,
+        $level: level
+    });
+
+    if (result_lowest)
+        return result_lowest;
+
+    // If track has no formats, return false
+    return false;
 }
 
 // TRACK_FRAME
@@ -400,7 +490,7 @@ export function add_track_frames(track_id, format_id, frames) {
 
 export function get_track_frames(track_id, format_id, start_index, num) {
     // Get
-    const select = db.prepare("SELECT * FROM track_frame WHERE track_id = $track_id AND format_id = $format_id AND id >= $start_index LIMIT $num");
+    const select = db.prepare("SELECT * FROM track_frame WHERE track_id = $track_id AND format_id = $format_id AND frame_index >= $start_index LIMIT $num");
     const result = select.all({
         $track_id: track_id,
         $format_id: format_id,
@@ -419,3 +509,125 @@ export function get_formats() {
 
     return result;
 }
+
+// SEARCH
+export function add_search_index(item, track, collection, creator, genre) {
+    // Clean values
+    track.name = track.name.replace(/[^0-9a-z ]/gi, '').toLowerCase();
+    collection.name = collection.name.replace(/[^0-9a-z ]/gi, '').toLowerCase();
+    creator.name = creator.name.replace(/[^0-9a-z ]/gi, '').toLowerCase();
+    genre.name = genre.name.replace(/[^0-9a-z ]/gi, '').toLowerCase();
+
+    // Insert
+    const insert =  db.prepare(`INSERT INTO search_index(
+                                    item, collection, creator, genre, 
+                                    item_id, collection_id, creator_id, genre_id
+                                ) VALUES (
+                                    $item, $collection, $creator, $genre, 
+                                    $item_id, $collection_id, $creator_id, $genre_id
+                                )`);
+    const result = insert.run({
+        $item: track.name,
+        $collection: collection.name,
+        $creator: creator.name,
+        $genre: genre.name,
+
+        $item_id: item.id,
+        $collection_id: collection.id,
+        $creator_id: creator.id,
+        $genre_id: genre.id
+    });
+
+    return { id: result.lastInsertRowid };
+}
+
+export function get_search_index(item_id, collection_id, creator_id, genre_id) {
+    // Insert
+    const select =  db.prepare(`SELECT * FROM search_index
+                                WHERE item_id = $item_id
+                                AND collection_id = $collection_id
+                                AND creator_id = $creator_id
+                                AND genre_id = $genre_id`);
+    const result = select.get({
+        $item_id: item_id,
+        $collection_id: collection_id,
+        $creator_id: creator_id,
+        $genre_id: genre_id
+    });
+
+    if (!result)
+        return false;
+
+    return result;
+}
+
+export function search_items(string, page, page_size) {
+    // Get
+    const select =  db.prepare(`SELECT item_id as id, SUM(rank) as score FROM (
+                                SELECT item, collection, creator, genre, bm25(search_index, 10.0, 4.0, 2.0, 1.0) AS rank, item_id
+                                FROM search_index
+                                WHERE search_index MATCH $string
+                                ORDER BY rank)
+                                GROUP BY item_id
+                                ORDER BY score ASC
+                                LIMIT $size
+                                OFFSET $offset`);
+    const result = select.all({
+        $string: string,
+        $size: page_size,
+        $offset: page * page_size
+    });
+
+    if (!result)
+        return false;
+
+    return result;
+}
+
+export function search_collections(string, page, page_size) {
+    // Get
+    const select =  db.prepare(`SELECT collection_id as id, SUM(rank) as score FROM (
+                                SELECT item, collection, creator, genre, bm25(search_index, 2.0, 10.0, 4.0, 1.0) AS rank, collection_id
+                                FROM search_index
+                                WHERE search_index MATCH $string
+                                ORDER BY rank)
+                                GROUP BY collection_id
+                                ORDER BY score ASC
+                                LIMIT $size
+                                OFFSET $offset`);
+    const result = select.all({
+        $string: string,
+        $size: page_size,
+        $offset: page * page_size
+    });
+
+    if (!result)
+        return false;
+
+    return result;
+}
+
+export function search_creators(string, page, page_size) {
+    // Get
+    const select =  db.prepare(`SELECT creator_id as id, SUM(rank) as score FROM (
+                                SELECT item, collection, creator, genre, bm25(search_index, 2.0, 4.0, 10.0, 1.0) AS rank, creator_id
+                                FROM search_index
+                                WHERE search_index MATCH $string
+                                ORDER BY rank)
+                                GROUP BY creator_id
+                                ORDER BY score ASC
+                                LIMIT $size
+                                OFFSET $offset`);
+    const result = select.all({
+        $string: string,
+        $size: page_size,
+        $offset: page * page_size
+    });
+
+    if (!result)
+        return false;
+
+    return result;
+}
+
+// Can add search for genres later

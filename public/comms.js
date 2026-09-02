@@ -135,6 +135,9 @@ const Comms = new class {
 
         // Create ID for this request
         this.current_req_id++;
+        if (this.current_req_id > 0xFFFF)
+            this.current_req_id = 0;
+
         parameters.req_id = this.current_req_id;
 
         // Send!
@@ -157,15 +160,64 @@ const Comms = new class {
         });
     }
 
-    async on_ws_message(event) {
-        const data = await event.data.arrayBuffer();
-    
-        // Get type
-        const data_view = new DataView(data)
-        const req_id = data_view.getUint16(0, true);
-        let req, req_pos;
+    async get_frame(index) {
+        // Create what we send
+        const buffer = new Uint8Array(2 + 2);
+        const buffer_view = new DataView(buffer.buffer);
+        buffer_view.setUint16(2, index);
+        
+        // Create ID for this request
+        this.current_req_id++;
+        if (this.current_req_id > 0xFFFF)
+            this.current_req_id = 0;
 
-        // Find our beloved request
+        const req_id = this.current_req_id;
+        buffer_view.setUint16(0, req_id);
+
+        // Send!
+        if (!this.connected)
+            await this.ready;
+        this.websocket.send(buffer);
+
+        // Make promise for result, add the req
+        return new Promise((resolve, reject) => {
+            // And add the req to buffer
+            this.reqs.push({
+                req_id: req_id,
+                time_sent: Date.now(),
+
+                resolve: resolve,
+                reject: reject
+            });
+        });
+    }
+
+    async on_ws_message(event) {
+        // Parse binary or JSON
+        let req_id, data;
+        if (event.data instanceof Blob) {
+            // Parse binary and create Uint8Array from the data
+            data = await event.data.arrayBuffer();
+            const data_view = new DataView(data);
+
+            let parsed = {};
+            parsed.req_id = data_view.getUint16(0);
+            parsed.size = data_view.getUint16(2);
+            parsed.data = new Uint8Array(data.slice(4)); // Copy binary data into buffer
+
+            data = parsed;
+        } else {
+            // Parse JSON
+            data = JSON.parse(event.data);
+        }
+
+        // Show error if debug on
+        //if (data.status !== null && data.status == false)
+        //    alert(data.error);
+
+        // Read req_id and find the corresponding request
+        req_id = data.req_id;
+        let req, req_pos;
         for (let i = 0; i < this.reqs.length; i++) {
             if (this.reqs[i].req_id == req_id) {
                 req = this.reqs[i];
@@ -173,55 +225,21 @@ const Comms = new class {
             }
         }
 
-        if (!req)
+        if (!req) // If we can't find the request, silently ignore
             return false;
 
-        // Log size and update debug info
-        this.total_transfer += data.byteLength;
-        const mb = this.total_transfer / 1_000_000;
+        // Log request timestamp and size
+        // TODO: Add this
 
-        let delta = performance.now() - this.prev_transfer_time; // ms
-        if (delta < 1)
-            delta = 1;
-
-        delta /= 1000;
-
-        this.transfer_rate = this.transfer_rate * 0.5 + (data.byteLength / delta) * 0.5; // lerp, and keep track of seconds
-        //debug_info.innerHTML = `Transfer total: ${mb.toFixed(1)} mb<br>Transfer rate:  ${(this.transfer_rate / (1000 / 8)).toFixed(1)} kbps`;
-
-        this.prev_transfer_time = performance.now();
-
-        // Do it
+        // Return data
         req.resolve(data);
 
-        // Remove request because it succeded
+        // Remove completed request
         this.reqs.splice(req_pos, 1);
         return true;
     }
-
-    async register_sw() {
-        if ("serviceWorker" in navigator) {
-            try {
-                const registration = await navigator.serviceWorker.register("/sw.js", {
-                scope: "/",
-                });
-                if (registration.installing) {
-                console.log("Service worker installing...");
-                } else if (registration.waiting) {
-                console.log("Service worker installed.");
-                } else if (registration.active) {
-                console.log("Service worker active.");
-                }
-            } catch (error) {
-                console.error(`Registration failed with ${error}.`);
-            }
-        }
-    }
 }
-
-
-// Enable caching of fetch requests
-//Comms.register_sw();
 
 // Export
 export default Comms;
+window.comms = Comms;

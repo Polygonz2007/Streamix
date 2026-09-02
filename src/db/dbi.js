@@ -17,21 +17,21 @@ export function creator(name, type, generated) {
         creator_type = { id: database.add_creator_type(type) };
 
     // Add creator
-    creator = { id: database.add_creator(name, creator_type.id, generated), new: true };
+    creator = { id: database.add_creator(name, creator_type.id, generated), name: name, new: true };
 
     return creator;
 }
 
 // Returns ID of collection, either new or pre-existing
-export function collection(name, type, creator_id, generated) {
+export function collection(name, type, creator, image, generated) {
     // Check existance
-    let collection = database.get_collection_name(name, creator_id);
+    let collection = database.get_collection_name(name, creator.id);
     if (collection)
         return collection;
 
     // If not available, validate creator, create type, then creator
     // Validate creator
-    if (!database.get_creator_id(creator_id).id)
+    if (!database.get_creator_id(creator.id))
         return false;
 
     // Add / get type
@@ -40,7 +40,7 @@ export function collection(name, type, creator_id, generated) {
         collection_type = { id: database.add_collection_type(type) };
 
     // Add collection
-    collection = { id: database.add_collection(name, creator_id, collection_type.id, generated), new: true };
+    collection = { id: database.add_collection(name, creator.id, collection_type.id, image, generated), name: name, has_image: image !== undefined, new: true };
 
     return collection;
 }
@@ -53,46 +53,59 @@ export function genre(name) {
         return genre;
 
     // Add genre
-    genre = { id: database.add_genre(name) };
+    genre = { id: database.add_genre(name), name: name };
 
     return genre;
 }
 
-export function track(name, number, disc, duration, released, collection_id, creators, genres, path) {
+export function track(name, number, disc, duration, released, collection, path) {
     // Check existance
-    let track = database.get_track_name(name, collection_id);
+    let track = database.get_track_name(name, collection.id);
     if (track)
         return track;
 
     // Validate collection
-    if (!database.get_collection_id(collection_id))
+    if (!database.get_collection_id(collection.id))
         return false;
 
     // Add track
-    track = { id: database.add_track(name, number, disc, duration, released, path), new: true };
+    track = { id: database.add_track(name, number, disc, duration, released, path), name: name, new: true };
 
-    // Add track_collection
-    database.add_track_collection(track.id, collection_id, number);
+    return track;
+}
 
+export function item(track, collection, position) {
+    // Check existance
+    let item = database.get_item_track_collection(track.id, collection.id);
+    if (item)
+        return item;
+
+    // Add item
+    item = { id: database.add_item(track.id, collection.id, position) };
+
+    return item;
+}
+
+export function track_creators(track, creators) {
     // Add / get creator-s
-    let creator_ids = [];
     for (let i = 0; i < creators.length; i++) {
-        creator_ids.push(creator(creators[i], "artist", true).id); // Default type artist. If creator already exists it is not modified.
+        creators[i] = creator(creators[i], "artist", true); // Default type artist. If creator already exists it is not modified.
     }
 
     // Add track_creator-s
-    database.track_creators(track.id, creator_ids);
+    database.track_creators(track.id, creators);
+    return creators;
+}
 
+export function track_genres(track, genres) {
     // Add / get genre-s
-    let genre_ids = [];
     for (let i = 0; i < genres.length; i++) {
-        genre_ids.push(genre(genres[i]).id); // Default type artist. If cgenre already exists it is not modified.
+        genres[i] = genre(genres[i]); // If genre already exists it is not modified.
     }
 
     // Add track_genres
-    database.track_genres(track.id, genre_ids);
-
-    return track;
+    database.track_genres(track.id, genres);
+    return genres;
 }
 
 export function track_format(track_id, format_id, ready, overwrite) {
@@ -112,4 +125,114 @@ export function track_format(track_id, format_id, ready, overwrite) {
     return track_format;
 }
 
+export function search_index(item, track, collection, creators, genres) {
+    // Explode values
+    let indexes = [];
+    for (let i = 0; i < creators.length; i++) {
+        for (let j = 0; j < genres.length; j++) {
+            indexes.push({
+                item: item,
+                track: track,
+                collection: collection,
+                creator: creators[i],
+                genre: genres[j]
+            });
+        }
+    }
+
+    // Do for each comination
+    indexes.forEach((index) => {
+        // Try to get with ids
+        let search_index = database.get_search_index(index.item.id, index.collection.id, index.creator.id, index.genre.id);
+        if (search_index)
+            return;
+
+        // Add search index
+        database.add_search_index(index.item, index.track, index.collection, index.creator, index.genre);
+    })
+
+    return true;
+}
+
 // If one of these has a "new" property, it was made by the current call. Else it wasnt. Can get id with .id on any of these
+
+export function get_meta(item_id) {
+    let result = {};
+
+    // Get track collection
+    const { track_id, collection_id } = database.get_item_id(item_id);
+
+    // Get track
+    result.track = database.get_track_id(track_id);
+    if (!result.track)
+        return false;
+
+    // Get collection
+    result.collection = database.get_collection_id(collection_id);
+    if (!result.collection)
+        return false;
+
+    // Get creator of collection (generated)
+    result.collection_creator = database.get_creator_id(result.collection.creator_id);
+    if (!result.collection_creator)
+        return false;
+
+    // Get track creators
+    result.creators = database.get_track_creators(track_id);
+    if (!result.creators)
+        return false;
+
+    // Get track genres
+    result.genres = database.get_track_genres(track_id);
+    if (!result.genres)
+        return false;
+
+    // Return
+    return result;
+}
+
+export function search(string, page, page_size) {
+    let result = {};
+
+    // Format string query
+    const tokens = string.split(" ");
+    if (tokens[tokens.length - 1].length > 0)
+        string += "*";
+
+    // Search each type and put into results
+    const items = database.search_items(string, page, page_size);
+    if (items) {
+        let full_items = [];
+        items.forEach((item) => {
+            let track = database.get_track_item(item.id);
+            full_items.push({
+                id: item.id,
+                track: track
+            });
+        });
+
+        result.items = full_items;
+    }
+
+    const collections = database.search_collections(string, page, page_size);
+    if (collections) {
+        let full_collections = [];
+        collections.forEach((collection) => {
+            full_collections.push(database.get_collection_id(collection.id));
+        });
+        
+        result.collections = full_collections;
+    }
+
+    const creators = database.search_creators(string, page, page_size);
+    if (creators) {
+        let full_creators = [];
+        creators.forEach((creator) => {
+            full_creators.push(database.get_creator_id(creator.id));
+        });
+        
+        result.creators = full_creators;
+    }
+
+    return result;
+}

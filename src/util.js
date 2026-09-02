@@ -39,8 +39,12 @@ const Utils = new class {
         return string;
     }
 
+    clear_line() {
+        process.stdout.clearLine();
+    }
+
     overwrite_line(text) {
-        process.stdout.clearLine(0); process.stdout.cursorTo(0);
+        process.stdout.cursorTo(0);
         process.stdout.write(text);
         return;
     }

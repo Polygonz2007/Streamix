@@ -9,35 +9,31 @@
 
 
 // Imports
-import { spawn } from "child_process";
-import { Readable, Writable } from "stream";
-
 import * as database from "./db/database.js";
 import Stats from "./stats.js";
-import { appendFileSync, createWriteStream, readFileSync, writeFileSync } from "fs";
 
 const Stream = class {
     constructor() {
         // Streaming
         this.track_id = 0;
-        this.format_id = 1;
-        this.frame_index = 0;
+        this.level = 0;
+        this.format_id = null;
 
         // Caching
         this.cache = [];
         this.cache_size = 256;
-        this.cache_index = 0;
+        this.cache_start = -Infinity;
         this.cache_mem_size = 0;
     }
 
-    async reload_cache() {
-        const start = performance.now();
-        
-        const result = database.get_track_frames(this.track_id, this.format_id, this.frame_index, this.cache_size);
+    // Call when track_id or level or frame_index changes
+    async reload_cache(start_index) {
+        const result = database.get_track_frames(this.track_id, this.format_id, start_index, this.cache_size);
         if (!result)
             return false;
 
         this.cache = result;
+        this.cache_start = start_index;
 
         Stats.log("cache", -this.cache_mem_size);
         this.cache_mem_size = 0;
@@ -46,34 +42,35 @@ const Stream = class {
         }
         Stats.log("cache", this.cache_mem_size);
 
-        const end = performance.now();
-        console.log(`Cache updated in ${(end - start).toFixed(4)}ms`);
+        return true;
     }
 
-    async next_cache_frame() {
-        this.cache_index++;
-
-        if (this.cache_index >= this.cache_size) {
-            this.reload_cache();
-            this.cache_index = 0;
+    // Get next frame data for playback
+    async get_frame(frame_index) {
+        let index = frame_index - this.cache_start;
+        if (!index || index < 0 || index >= this.cache_size) {
+            const success = this.reload_cache(frame_index);
+            if (!success)
+                return false;
+            
+            index = frame_index - this.cache_start;
         }
+        
+        const frame = this.cache[index];
+        if (!frame)
+            return false;
 
-        if (this.cache.length == 0)
-            return false; // No data to be had
-
-        const frame = this.cache[this.cache_index];
         Stats.log("frame_bytes", frame.frame_size);
         return frame;
     }
 
+    // Deallocate this
     close() {
         // Deallocate buffers
-
+        delete this.cache;
 
         // Stats
         Stats.log("cache", -this.cache_mem_size);
-
-        // Kill ffmpeg
 
         return;
     }

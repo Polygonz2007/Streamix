@@ -2,69 +2,77 @@
 import Utils from "/util.js";
 import Comms from "/comms.js";
 import Controller from "./controller.js";
+import Stream from "./stream.js";
 
-const Track = class {
-    constructor(track_id) {
+export const Item = class {
+    constructor(item_id) {
         this.loaded = false;
-        this.track_id = track_id;
+        this.id = item_id;
         this.index = -1;
         
         this.load();
     }
 
     async load() {
-        const data = await Comms.fetch_json(`/track/${this.track_id}`);
+        const data = await Comms.fetch_json(`/item/${this.id}`);
         if (!data)
         return false;
 
         this.track = data.track;
-        this.album = data.album;
-        this.artists = data.artists;
-        this.album_artist = data.album_artist;
+        this.collection = data.collection;
+        this.creators = data.creators;
+        this.track_creators = data.track_creators;
 
         this.loaded = true;
         return true;
     }
 }
-window.track = Track;
 
-const Queue = new class {
+export const Queue = new class {
     constructor() {
-        this.tracks = [];
+        this.items = [];
     }
 
-    add(track, pos) { // Adds a track and shifts positions of other tracks to
+    async add(item, pos) { // Adds a item and shifts positions of other items
         // Do any necessary shifting
         if (pos !== undefined) {
-            for (let i in this.tracks) {
-                if (this.tracks[i].index >= pos)
-                    this.tracks[i].index++;
+            for (let i in this.items) {
+                if (this.items[i].index >= pos)
+                    this.items[i].index++;
             }
         }
         
-        // Add track in place
-        track.index = (pos !== undefined) ? pos : this.tracks.length;
-        this.tracks.splice(track.index, 0, track);
+        // Add item in place
+        if (pos === undefined)
+            pos = this.items.length;
+        
+        item.index = (pos !== undefined) ? pos : this.items.length;
+        this.items.splice(item.index, 0, item);
+
+        // Display in html
+        await item.load();
+        document.querySelector("#queue").innerHTML += `<div><p>${item.track.name} by ${item.creators[0].name}</p><input type="button" onclick="controller.goto(${item.index});" value="Play" /></div>`;
+
         return;
     }
 
     remove(pos) {
         if (pos === null) return;
-        if (this.tracks.length == 0) return;
+        if (this.items.length == 0) return;
 
-        // Remove track
-        const c_pos = Controller.track.index;
-        this.tracks.splice(pos, 1);
+        // Remove item
+        const c_pos = Controller.item.index;
+        this.items.splice(pos, 1);
 
         // Shift item indecies
-        for (let i in this.tracks) {
-            if (this.tracks[i].index > pos)
-                this.tracks[i].index--;
+        for (let i in this.items) {
+            if (this.items[i].index > pos)
+                this.items[i].index--;
         }
 
         // Keep playing if active was removed
         if (c_pos == pos)
-            Controller.play(Queue.tracks[c_pos]);
+            Controller.play(Queue.items[c_pos]);
 
         return;
     }
@@ -74,8 +82,16 @@ export default Queue;
 window.queue = Queue;
 
 // Test casing
-const num_tracks = 751;//Math.ceil(Math.random() * 20);
-for (let i = 0; i < num_tracks; i++) {
-    const track_id = i+1;//Math.ceil(Math.random() * 354);
-    Queue.add(new Track(track_id));
-}
+//const num_items = 5;//Math.ceil(Math.random() * 20);
+//for (let i = 0; i < num_items; i++) {
+//    const item_id = i+1;//Math.ceil(Math.random() * 354);
+//    Queue.add(new Item(item_id));
+//}
+
+//Queue.add(new Item(970));
+//Queue.add(new Item(908));
+//Queue.add(new Item(554));
+//Queue.add(new Item(24));
+//Queue.add(new Item(683));
+//Queue.add(new Item(332));
+//Queue.add(new Item(147));

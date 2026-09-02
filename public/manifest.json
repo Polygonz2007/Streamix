@@ -1,7 +1,7 @@
 {
     "name": "Streamix",
     "display": "fullscreen",
-    "start_url": "/",
+    "start_url": "/play",
     "icons": [
       {
         "src": "asset/logo/512/Winter.png",

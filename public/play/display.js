@@ -9,38 +9,44 @@ const Display = new class {
 
             "controls": document.querySelector("#controls")
         }
+
+        // Seekbar
+        this.seekbar_update_interval = 0.1;
     }
 
-    set_track(track) {
-        if (!track)
+    set_item(item) {
+        if (!item)
             return; 
 
         // Generate artist html
         let artist_html = "<span>by </span>";
-        const num_artists = track.artists.length;
+        const num_creators = item.creators.length;
 
-        for (let i = 0; i < num_artists; i++) {
+        for (let i = 0; i < num_creators; i++) {
             // Add spacings
-            if (num_artists > 1) {
-                if (i == num_artists - 1)
+            if (num_creators > 1) {
+                if (i == num_creators - 1)
                     artist_html += "<span> and </span>";
                 else if (i > 0)
                     artist_html += "<span>, </span>";
             }
 
             // Add artist name
-            artist_html += `<a>${track.artists[i].name}</a>`
+            artist_html += `<a>${item.creators[i].name}</a>`
         }
 
         // Set text
-        this.elements.title.innerHTML = track.track.name;
+        this.elements.title.innerHTML = item.track.name;
         this.elements.artist.innerHTML = artist_html;
-        this.elements.album.innerHTML = `<span>from </span><a>${track.album.name}</a>`;
+        this.elements.album.innerHTML = `<span>from </span><a>${item.collection.name}</a>`;
+
+        // Backgroound
+        document.querySelector("body").style.backgroundImage = `url(/collection/${item.collection.id}/image)`;
 
         return true;
     }
 
-    clear_track() {
+    clear_item() {
         this.elements.title.innerHTML = "Title [Number / Total]";
         this.elements.artist.innerHTML = "Artist(s)";
         this.elements.album.innerHTML = `Album`;
@@ -57,7 +63,7 @@ const Display = new class {
     }
 
     error(text) {
-        this.clear_track();
+        this.clear_item();
         this.elements.title.innerHTML = text;
         return true;
     }

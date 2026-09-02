@@ -10,6 +10,9 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // Imports
+import * as fs from "fs/promises";
+
+import Utils from "./src/util.js";
 import * as database from "./src/db/database.js";
 import * as dbi from "./src/db/dbi.js";
 import Stats from "./src/stats.js";
@@ -90,31 +93,37 @@ wss.on('connection', (ws, req) => {
 
     ws.on('message', async (data, isBinary) => {
         //const start_time = performance.now();
+        const client = req.session;
+        Stats.log("ws_req");
 
-        // Translate
+        // Getting frames fast
+        if (isBinary) {
+            const data_view = new DataView(data.buffer);
+            const req_id = data_view.getUint16(0);
+            const frame_index = data_view.getUint16(2);
+
+            const frame = await wsi.get_frame(client, req_id, frame_index);
+            return ws.send(frame);
+        }
+
+        // Client wants to do an action. Parse JSON
         data = isBinary ? data : data.toString();
         data = JSON.parse(data);
 
         // Get important stuff
-        const client = req.session;
-        const type = data.type;
+        const target = data.target;
+        const action = data.action;
 
-        // Switch case
         let result;
-        switch (type) {
-            case 0: result = await wsi.next_buffer(client, data); break;
+        switch (action) {
+            // Streaming
+            case "set_state":       result = await wsi.set_state(client, data); break;
+            //case 4: result = await wsi.seek_to(client, data); break;
 
-            case 1: result = await wsi.set_track(client, data); break;
-            case 2: result = await wsi.set_format(client, data); break;
-
-            case 4: result = await wsi.seek_to(client, data); break;
-            case 8: result = await wsi.log_played(client, data); break;
+            // Statistics
+            //case 8: result = await wsi.log_played(client, data); break;
         }
 
-        //const end_time = performance.now();
-        //console.log(`${(end_time - start_time).toFixed(2)}ms => Req #${data.req_id} from ${req.session.ip} of type ${type}`);
-
-        Stats.log("ws_req");
         ws.send(result);
     });
 
@@ -146,150 +155,79 @@ app.get("/favicon.ico", (req, res) => {
 });
 
 
-// Artists
 
-
-
-// Albums
-
-// Images
-app.get("/album/:album_id/:filename", (req, res) => {
-    const album_id = req.params.album_id;
-    if (!album_id)
+// Items
+app.get("/item/:item_id", async (req, res) => {
+    // Get IDs
+    const item_id = parseInt(req.params.item_id);
+    if (!item_id)
         return res.sendStatus(400);
 
-    const img = database.get_album_image(album_id);
-    if (!img) {
-        // Reply with default image
-        return res.sendFile(path.join(global.public_path, "asset/logo/512/Deep.png"));
-    }
-     
-    // Make sure size is within reason
-    if (!req.params.filename.endsWith(".jpg"))
+    // META
+    let metadata = dbi.get_meta(item_id);
+    if (!metadata)
+        return res.sendStatus(404); // Track does not exist
+
+    return res.send(metadata);
+});
+
+// Collections
+app.get("/collection/:collection_id", async (req, res) => {
+    // Get IDs
+    const collection_id = parseInt(req.params.collection_id);
+    if (!collection_id)
         return res.sendStatus(400);
 
-    if (req.params.filename == "max.jpg")
-        return res.contentType("image/jpeg").send(img);
+    // Get data
+    let data = database.get_collection_id(collection_id);
+    if (!data)
+        return res.sendStatus(404); // Track does not exist
 
-    let size = parseInt(req.params.filename);
-    if (!size)
-        return res.sendStatus(400);
+    return res.send(data);
+});
 
-    if (size < 32) // Too small
-        size = 32;
+app.get("/collection/:collection_id/image", async (req, res) => {
+    // Get IDs
+    const collection_id = parseInt(req.params.collection_id);
+    if (!collection_id)
+        return res.sendStatus(400).send("Collection does not exist.");
 
-    //return res.contentType("image/jpeg").send(img);
+    // Get image
+    let { image } = database.get_collection_image(collection_id);
+    if (!image)
+        return res.sendFile(path.join(public_path, "asset/logo/512/Winter.png")); // No cover available
 
-    // Scale image to desired size and send
-    Sharp(img)
+    // Downsize (constant for now)
+    const size = 1024;
+
+    Sharp(image)
     .resize({ width: size, kernel: "mks2021" })
-    .jpeg({ quality: 90, chromaSubsampling: '4:4:4', force: "true" }) // keep good quality and colors, while optimizing for network
+    .jpeg({ quality: 90, chromaSubsampling: '4:4:4', force: "true" }) // Keep good quality and colors, while optimizing for network
     .toBuffer()
     .then(scaled_img => {
         return res.contentType("image/jpeg").send(scaled_img);
     });
 });
 
-
-
-// Tracks
-app.get("/track/:track_id", (req, res) => {
-    // Get ID
-    const track_id = parseInt(req.params.track_id);
-    if (!track_id)
-        return res.sendStatus(400); // Give us an id idiot.
-
-    // META
-    const metadata = database.get_track_meta(track_id);
-    if (!metadata)
-        return res.sendStatus(404); // Track does not exist
-
-    return res.send(create_metadata_json(metadata));
-});
-
-function create_metadata_json(metadata) {
-    let data = {
-        "track": {
-            "name": metadata.track,
-            "id": metadata.track_id,
-            "number": metadata.track_number
-        },
-
-        "album": {
-            "name": metadata.album,
-            "id": metadata.album_id,
-            "cover": metadata.album_cover == 0 ? true : false
-        },
-
-        "artists": [],
-        "album_artist": {
-            "name": metadata.album_artist,
-            "id": metadata.album_artist_id
-        }
-    };
-
-    for (let i = 0; i < metadata.artists.length; i++) {
-        data.artists.push({
-            "name": metadata.artists[i].artist,
-            "id": metadata.artists[i].artist_id
-        });
-    }
-
-    return data;
-}
-
 // Searching
-app.post("/search", (req, res) => {
-    // type: all, tracks, albums, artists (if none is present all is assumed)
-    // string: what to search for
-    // num_results: how many results to return
-    // page: 0 by default, if incremented shows more results (may be less related)
+app.post("/search", async (req, res) => {
+    // Check
+    let string = req.body.string;
+    if (string == "")
+        return res.status(400).send("Please provide a search query.");
 
-    // Maybe replace with SQLite FTS5, but for now simple search
-    // Foe now only tracks!
-
-    // Updates
-    const data = req.body;
-    let string = data.string;
-    if (!string)
-        string = "";
+    const page = req.body.page || 0;
+    const page_size = req.body.page_size || 16;
 
     // Clean it
     string = string.toLowerCase();
-    string.replace("%", "");
-    string.replace("_", "");
+    string = string.replace(/[^0-9a-z ]/gi, '');
+    if (string.replace(/[^0-9a-z]/gi, '') == "")
+        return res.status(400).send("Please provide a search query.");
 
-    //let results = [];
-    //for (let i = 0; i < search_index.length; i++) {
-    //    if (results.length > 30)
-    //        break;
-//
-    //    const c = search_index[i];
-//
-    //    if (c.keywords.toLowerCase().indexOf(string) != -1) {
-    //        results.push({ "type": "track", "id": c.track_id, "index": i });
-    //        continue;
-    //    }
-    //}
-
-    // compile for now
-    const tracks = database.search(string, 32);
-    if (!tracks)
-        return res.send([]);
-
-    let results = [];
-    for (let i = 0; i < tracks.length; i++) {
-        results.push(create_metadata_json(tracks[i]));
-    }
-
+    // Search
+    const results = dbi.search(string, page, page_size);
     return res.send(results);
-
-    // Response strcurure:
-    // [
-    //    { type: track, id: __ },
-    //    { type: album, id: __ },
-    //    ...
-    // ]
 });
 
 
@@ -310,8 +248,8 @@ async function startup() {
     process.title = "Streamix";
 
     // Clear console
-    console.clear();
-    console.log("// Streamix v0.1 //");
+    //console.clear();
+    console.log("\n// Streamix v0.1 //");
     console.log(`HTTP server running. [:${config.http_port}]`);
 
     // Let us do stats
@@ -329,7 +267,8 @@ async function startup() {
         await Indexer.scan(music_dirs[i]);
     }
 
-    console.log("Database is up to date.");
+    Utils.clear_line();
+    Utils.overwrite_line("Database is up to date.\n");
 }
 
 // Start server
@@ -345,7 +284,7 @@ process.on('SIGTERM', shut_down);
 process.on('SIGINT', shut_down);
 
 function shut_down() {
-    console.log("\nSaving statistics and stopping server.");
+    console.log("\nSaving statistics and stopping server.\n");
 
     Stats.stats.clients = 0;
     Stats.stats.cache = 0;

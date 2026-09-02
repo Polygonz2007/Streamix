@@ -4,84 +4,54 @@ import * as database from "./db/database.js";
 
 
 /// FUNCTIONS ///
-// Create default response
-function response(req_id, status) {
-    let buf = new Buffer.alloc(4);
-    buf.writeUInt16LE(req_id, 0);
-    buf.writeUInt16LE(status, 2);
-    return buf;
+
+async function json(object) {
+    return JSON.stringify(object);
 }
 
-// Set the track that is being played
-export async function set_track(client, data) {
-    // Check if track exists, and get meta
-    const meta = database.get_track_format(data.track_id);
+// Set the state (track, format and frame_index) for current stream object
+// TODO: Add checks that stop you from setting invalid settings
+export async function set_state(client, data) {
+    // Keep un-changed state
+    if (!data.track_id)
+        data.track_id = client.stream.track_id;
+
+    if (!data.level)
+        data.level = client.stream.level;
+
+    if (!data.frame_index)
+        data.frame_index = client.stream.frame_index;
+
+    // Get format
+    const meta = database.get_track_format_by_level(data.track_id, data.level);
     if (!meta)
-        return response(data.req_id, 0); // If failed, respond with 0 (0 samplerate is not possible)
+        return json({ status: false, req_id: data.req_id, error: "Track does not exist or has not been indexed yet" });
 
     // Set state
     client.stream.track_id = data.track_id;
-    client.stream.frame_index = 0;
+    client.stream.format_id = meta.id;
+    //console.log(`Cache: Track #${data.track_id}, Level ${data.level}, Frame #${data.frame_index}`)
+    client.stream.reload_cache(data.frame_index);
 
-    // We need new cache!
-    client.stream.cache = [];
+    // Respond with format data
+    return json({
+        status: true,
+        req_id: data.req_id,
 
-    // Respond with nesecarry metadata.
-    const buffer_size = 2 + 4 + 4;
-    const buffer = new ArrayBuffer(buffer_size);
-    const buffer_view = new DataView(buffer);
-
-    buffer_view.setUint16(0, data.req_id, true);
-    buffer_view.setUint32(2, meta.sample_rate, true); // MAX SAMPLE RATE
-    buffer_view.setFloat32(6, meta.duration, true); // DURATION
-
-    return Buffer.from(buffer);
+        format: meta
+    });
 }
 
-export async function set_format(client, data) {
-    // Get track max format
-    const meta = database.get_track_format(client.stream.track_id);
-    if (!meta)
-        return response(data.req_id, 0); // WTF HOW
+export async function get_frame(client, req_id, frame_index) {
+    const frame = await client.stream.get_frame(frame_index);
+    if (!frame)
+        return json({ status: false, req_id: req_id, error: "No data found" });
 
-    // Make sure this is reasonable
-    if (meta.format > data.format)
-        data.format = meta.format; // Clamp to highest possible format
-
-    if (data.format > 6)
-        data.format = 6; // huh????
-
-    // Set state
-    client.stream.req_format = data.format;
-
-    // Respond with good code
-    return response(data.req_id, data.format);
-}
-
-export async function next_buffer(client, data) {
-    const frame = await client.stream.get_next_data();
-    if (!frame) {
-        console.log("Found no data!");
-        return response(data.req_id, 0); // bad!!
-    }
-
-    // Add the req id to start
-    const buffer = Buffer.alloc(frame.frame_data.length + 2);
-    buffer.writeUint16LE(data.req_id, 0);
-    buffer.set(frame.frame_data, 2);
+    // Add metadata
+    const buffer = Buffer.alloc(4 + frame.frame_size);
+    buffer.writeUint16BE(req_id, 0);
+    buffer.writeUint16BE(frame.frame_size, 2);
+    buffer.set(frame.frame_data, 4);
 
     return buffer;
-}
-
-export async function seek_to(client, data) {
-    // Be dumb for now...
-    client.stream.frame_index = data.frame_index;
-    client.stream.cache = []; // We need new cache!
-    console.log(`Jumped to frame index ${client.stream.frame_index}`);
-
-    return response(data.req_id, 1);
-}
-
-export async function log_played(client, data) {
-    
 }

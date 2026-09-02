@@ -1,7 +1,7 @@
 // Find all music and puts it in the database. Also updates database when files change.
 
 import * as fs from "fs/promises";
-import { existsSync, read } from "fs";
+import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { parseFile as parse_metadata } from 'music-metadata';
 
@@ -14,21 +14,11 @@ import { Readable } from "stream";
 
 import Utils from "./util.js";
 
-const formats = [
-    "None",
-    "Max [Flac]",
-    "CD [Flac]",
-    "High [Opus, 256 kbps]",
-    "Medium [Opus, 128 kbps]",
-    "Low [Opus, 64 kbps]",
-    "Trash [Opus, 24 kbps]"
-]
-
 const Indexer = new class {
     constructor(auto_update) {
         this.auto_update = auto_update;
-        this.max_threads = 8; // Max threads to use at once while indexing data
-        this.max_level = 0; // Highest quality level that the indexer will index to
+        this.max_threads = 16; // Max threads to use at once while indexing data
+        this.max_level = 3; // Highest quality level that the indexer will index to
 
         // Indexing
         this.jobs = new Map(); // Job index -> Track id and format
@@ -91,9 +81,85 @@ const Indexer = new class {
         if (data.common.track.of == 1)
             collection_type = "single";
 
+        // Add / sync metadata with database
         const creator = dbi.creator(data.common.albumartist || data.common.artists[0], creator_type, true);
-        const collection = dbi.collection(data.common.album, collection_type, creator.id, true);
-        const track = dbi.track(data.common.title, data.common.track.no, data.common.disk.no, data.format.duration, data.common.date, collection.id, data.common.artists || [], data.common.genre || [], file_path);
+        if (!creator) {
+            console.log("Something went wrong adding creator.");
+            return;
+        }
+
+        const collection = dbi.collection(data.common.album, collection_type, creator, null, true);
+        if (!collection) {
+            console.log("Something went wrong adding collection.");
+            return;
+        }
+
+        const track = dbi.track(data.common.title, data.common.track.no, data.common.disk.no, data.format.duration, data.common.date, collection, file_path);
+        if (!creator) {
+            console.log("Something went wrong adding track.");
+            return;
+        }
+        
+        const item = dbi.item(track, collection, data.common.track.no);
+        if (!item) {
+            console.log("Something went wrong adding item.");
+            return;
+        }
+        
+        const creators = dbi.track_creators(track, data.common.artists || []);
+        if (!creators) {
+            console.log("Something went wrong adding track creators.");
+            return;
+        }
+
+        const genres = dbi.track_genres(track, data.common.genre || []);
+        if (!genres) {
+            console.log("Something went wrong adding track genres.");
+            return;
+        }
+
+        // Add search index
+        const search_index = dbi.search_index(item, track, collection, creators, genres);
+        if (!search_index) {
+            console.log("Something went wrong adding search_index.");
+            return;
+        }
+
+        // Add collection image if it doesnt already have
+        if (!collection.has_image) {
+            // Find image (if available)
+            let image;
+            let image_path = file_path;
+            for (let i = 0; i < 2; i++) {
+                if (image)
+                    continue;
+
+                // Search for image
+                image_path = path.join(image_path, "..");
+
+                const png_path = path.join(image_path, "cover.png");
+                const jpg_path = path.join(image_path, "cover.jpg");
+
+                if (existsSync(png_path)) {
+                    image = readFileSync(png_path);
+                    continue;
+                }
+
+                if (existsSync(jpg_path)) {
+                    image = readFileSync(jpg_path);
+                    continue;
+                }
+            }
+
+            // Last, check file itself
+            if (!image) {
+                image = data.common.picture[0].data;
+            }
+
+            // Add it if it exists!
+            if (image)
+                database.update_collection_image(collection.id, image);
+        }
 
         // Later add more data
         return {
@@ -113,26 +179,21 @@ const Indexer = new class {
         const input = "pipe:0";
         let output = "pipe:1";
 
-        // Get frame size (if not present, use defaults)
-        const opus_frame_size = (process.env.opus_frame_size || 960) / 48; // samples / 48000 * 1000 ms
-        const flac_frame_size = process.env.flac_frame_size || 4096;
-
-        // Parse format data
         // INPUT
-        let params = ["-i", input]
+        let params = ["-i", input];
 
         // ENCODER (c:a, application)
         params.push("-c:a", format.encoder);
 
         if (format.encoder == "libopus") {
             params.push("-application", "audio");
-            params.push("-frame_duration", opus_frame_size);
+            params.push("-frame_duration", (format.frame_size / format.samplerate) * 1000);
         } else if (format.encoder == "flac") {
-            params.push("-frame_size", flac_frame_size);
+            params.push("-frame_size", format.frame_size);
         }
 
         // SAMPLERATE
-        params.push("-ar", format.samplerate)
+        params.push("-ar", format.samplerate);
 
         // SAMPLE_FORMAT
         if (format.bitdepth)
@@ -152,6 +213,9 @@ const Indexer = new class {
         else if (format.encoder == "flac")
             params.push("-f", "flac");
         
+        // USE ALL CPU
+        params.push("-threads", "0");
+
         params.push(output);
 
         // Be quiet!
@@ -176,12 +240,11 @@ const Indexer = new class {
         });
 
         ffproc.stderr.on("data", (data) => {
-            console.log(`Ffmpeg error: ${data}`);
+            console.error(`FFMPEG error: ${data}`);
             reject(data);
         });
 
         ffproc.on("close", (code) => {
-            //console.log(`FFmpeg closed with code ${code} for format ${format}.`);
             resolve(); 
         });
 
@@ -258,10 +321,8 @@ const Indexer = new class {
                         .filter(dirent => dirent.isFile() && dirent.name.endsWith(".flac"));
 
         for (let i = 0; i < files.length; i++) {    
-            const file = files[i];
-            const file_path = path.join(file.parentPath, file.name);
-
             // Add metadata to database, skip track if failed
+            const file = files[i];
             const meta = await this.index_meta(file);
             if (!meta)
                 continue;
@@ -277,7 +338,7 @@ const Indexer = new class {
                 if (meta.lossless < format.lossless)
                     continue;
                 
-                if (!meta.lossless && meta.bitrate < format.bitrate)
+                if (!meta.lossless && !format.lossless && meta.bitrate < format.bitrate)
                     continue;
 
                 if (meta.lossless && format.lossless && meta.samplerate < format.samplerate)
@@ -314,13 +375,25 @@ const Indexer = new class {
         for (let i = 0; i < this.max_threads; i++)
             this.check_jobs();
         
+        Utils.clear_line();
+
+        let prev = 0;
+        let diff = 0;
         while (this.jobs.size !== 0) {
-            Utils.overwrite_line(`Finished ${total_jobs - this.jobs.size} of ${total_jobs} jobs. [${(100 * (total_jobs - this.jobs.size) / total_jobs).toFixed(2)}%].`);
+            const current = total_jobs - this.jobs.size;
+            const smooth_diff = Utils.lerp(diff, current - prev, 0.1);
+            diff = smooth_diff;
+
+            const finished = total_jobs - this.jobs.size - this.max_threads
+            Utils.overwrite_line(`Finished ${finished > 0 ? finished : 0} of ${total_jobs} jobs. [${(100 * (total_jobs - this.jobs.size) / total_jobs).toFixed(2)}%, ${diff.toFixed(1)}/s] Threads: ${this.threads}`);
+            prev = current;
+
             await Utils.wait(1000);
         }
 
         const time_end = performance.now();
-        Utils.overwrite_line(`Successfully indexed ${files.length} tracks [${total_jobs} jobs] in ${((time_end - time_start) / (60 * 1000)).toFixed(2)} minutes.\n`);
+        Utils.clear_line();
+        Utils.overwrite_line(`Successfully transcoded and indexed ${total_jobs} quality levels in ${((time_end - time_start) / (60 * 1000)).toFixed(2)} minutes.\n`);
 
         return true;
     }

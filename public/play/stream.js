@@ -1,6 +1,7 @@
 
 import Comms from "/comms.js";
 import Frame from "./frame.js";
+import Buffer from "./buffer.js";
 
 import Utils from "/util.js";
 
@@ -10,28 +11,82 @@ const Stream = new class {
 
         // Params
         this.webworkers = false;
+        this.buffer_time = 2; // x seconds of audio should be buffered
         
         // Streaming
-        this.track_id = 329;
-        this.format = 3; // Opus High
+        this.context;
+        this._active = false; // When true, frames are activly loaded
+
+        this.track_id = 0;
+        this.level = 0;
+        this.format = {};
+
         this.time_offset = 0; // Seeking time offsets
         this.time_delay = 0; // Time offsets after small delays like loading
-        this.group_id = 0;
-
+        this.mad_time = 0;
+        
         // Frames
-        this.frames = [];
+        this.frames = new Buffer(196);
         this.frame_index = 0;
-        this.flac_frame_size = 3840; // Get automatically
-        this.opus_frame_size = 960;
+        this.group_id = 0;
 
         //this.test2 = this.test2.bind(this);
 
     }
 
+    /// PUBLIC DYNAMIC VARIABLES ///
+    get active() {
+        return this._active;
+    }
+
+    set active(active) {
+        this._active = active;
+
+        if (this.active)
+            this.check_buffer();
+    }
+
     /// PUBLIC INTERACTION FUNCTIONS ///
+    async set_state(track_id, level, frame_index, instant, buffer) {
+        this.active = false;
 
+        // Update the supplied values
+        if (track_id !== null)
+            this.track_id = track_id;
+
+        if (level !== null)
+            this.level = level;
+
+        if (frame_index !== null)
+            this.frame_index = frame_index;
+
+        this.group_id++;
+        await this.#load_format();
+
+        // Do it in the way they say we should...
+
+        this.active = true;
+        return {
+            track_id: this.track_id,
+            group_id: this.group_id,
+            level: this.level,
+            frame_index: this.frame_index
+        }
+    }
     
+    async stop() {
+        console.log("STOPPPPPP")
+        this.active = false;
+        this.context.suspend();
+    }
 
+    async keep_group(group_id) {
+        for (let i = 0; i < this.frames.size; i++) {
+            const frame = this.frames.item[i];
+            if (frame && frame.group_id != group_id)
+                frame.stop();
+        }
+    }
 
     /// PUBLIC UTILITY FUNCTIONS ///
 
@@ -42,7 +97,6 @@ const Stream = new class {
         success = success && await Comms.ws_connect();
         success = success && await this.#load_audio_context();
         success = success && await this.#load_decoders();
-        success = success && await this.#load_frame_sizes();
 
         return success;
     }
@@ -51,22 +105,40 @@ const Stream = new class {
         return this.context.currentTime;
     }
 
-    format_sample_size(format) {
-        if (format <= 2)     return this.flac_frame_size; // FLAC (Max or CD)
-        if (2 < format <= 6) return this.opus_frame_size; // OPUS (High, Mid, Low or Trash)
-
-        return false;
-    }
-
-    frame_duration(format, sample_rate) {
-        if (format <= 2)     return this.flac_frame_size / sample_rate; // FLAC (Max or CD)
-        if (2 < format <= 6) return this.opus_frame_size / sample_rate; // OPUS (High, Mid, Low or Trash)
-
-        return false;
-    }
-
-
     /// PRIVATE FUNCTIONS ///
+
+    // Recursivly creates new frames until the buffer is healthy
+    async check_buffer() {
+        const newest_frame = this.frames.newest;
+
+        let buffer_time = 0;
+        if (newest_frame)
+            buffer_time = newest_frame.time.start - this.time;
+
+        if (this.active && buffer_time < this.buffer_time) {
+            // Create frame
+            const frame = new Frame(this.track_id, this.group_id, this.format, this.frame_index);
+            
+            // Load and prepare the frame
+            this.frame_index++;
+            const fetch_success = await frame.fetch();
+            //console.log(newest_frame.done, !fetch_success)
+            if (newest_frame.done && !fetch_success)
+                this.stop();
+
+            const prepare_success = await frame.prepare();
+
+            //this.mad_time += frame.duration;
+            
+            frame.start((frame.index * frame.format.frame_size) / frame.format.samplerate + this.time_offset + this.time_delay);
+            this.frames.add(frame);
+
+            // Then try again to make sure buffer is healthy
+            this.check_buffer();
+        }
+
+        return true;
+    }
 
     async #load_decoders() {
         // Get
@@ -91,11 +163,24 @@ const Stream = new class {
         return true;
     }
 
-    async #load_frame_sizes() {
+    async #load_format() {
+        // Fetch
+        const data = await Comms.ws_req({
+            action: "set_state",
+            track_id: this.track_id,
+            level: this.level,
+            frame_index: this.frame_index
+        });
+
+        if (!data)
+            return false;
+
+        this.format = data.format;
+
         return true;
     }
 
-    #load_audio_context() {
+    async #load_audio_context() {
         // iOS no audio on silent mode fix
         if (navigator.audioSession)
             navigator.audioSession.type = "playback";
@@ -107,6 +192,7 @@ const Stream = new class {
 
         if (AudioContext) {
             this.context = new AudioContext({ "latencyHint": "playback" });
+            this.context.suspend();
             return true;
         } else { 
             alert("Sorry, this browser does not support AudioContext. Please upgrade to use Streamix!");

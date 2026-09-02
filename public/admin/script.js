@@ -10,7 +10,7 @@ import Comms from "/comms.js";
 const body = document.querySelector("body");
 
 const elements = {
-    buffer_bytes: document.querySelector("#buffer_bytes"),
+    frame_bytes: document.querySelector("#frame_bytes"),
     ws_req: document.querySelector("#ws_req"),
     clients: document.querySelector("#clients"),
     cache: document.querySelector("#cache")
@@ -18,7 +18,7 @@ const elements = {
 
 let width = 0;
 let height = 400;
-const canvas = document.querySelector("#buffer_bytes_graph");
+const canvas = document.querySelector("#frame_bytes_graph");
 const ctx = canvas.getContext("2d");
 
 // Smooth stats
@@ -34,7 +34,7 @@ async function update_stats() {
     if (!data) return;
 
     // Calculate some stats
-    data.buffer_bytes_rate = ((stats.buffer_bytes - prev_stats.buffer_bytes) / update_rate) || 0;
+    data.frame_bytes_rate = ((stats.frame_bytes - prev_stats.frame_bytes) / update_rate) || 0;
     data.ws_req_rate = ((stats.ws_req - prev_stats.ws_req) / update_rate) || 0;
 
     // Udpate
@@ -66,28 +66,28 @@ function display_html() {
 
     //body.innerHTML = `<h1>Stream Statistics</h1>
     //    <p>Server has started up ${data.startups} times...!</p>
-    //    <p>A total of ${(data.buffer_bytes / 1_000_000).toFixed(2)} MB has been transferred over ${data.ws_req} buffers.</p>
+    //    <p>A total of ${(data.frame_bytes / 1_000_000).toFixed(2)} MB has been transferred over ${data.ws_req} frames.</p>
     //    <p>HTTP requests: ${data.http_get}!!!</p>`;
 
-    elements.buffer_bytes.innerText = `${Utils.byte_size_string(data.buffer_bytes, 2, true)} [${Utils.byte_size_string(data.buffer_bytes_rate / 0.125)}ps]`;
-    elements.ws_req.innerText = `${data.ws_req} [${data.ws_req_rate}/s]`;
-    elements.clients.innerText = `${data.clients} [${Utils.byte_size_string(data.buffer_bytes_rate / (0.125 * (data.clients || 1)), 0, false)}ps per client avg.]`;
-    elements.cache.innerText = `${Utils.byte_size_string(data.cache)}`;
+    elements.frame_bytes.innerText = `${Utils.byte_size_string(data.frame_bytes, 2, true)} [${Utils.byte_size_string(data.frame_bytes_rate / 0.125)}ps]`;
+    elements.ws_req.innerText = `${Utils.number_to_readable_string(data.ws_req)} [${data.ws_req_rate}/s]`;
+    elements.clients.innerText = `${data.clients} [${Utils.byte_size_string(data.frame_bytes_rate / (0.125 * (data.clients || 1)), 0, false)}ps per client avg.]`;
+    elements.cache.innerText = `${Utils.byte_size_string(data.cache, 1, true)}`;
 
     display_graph();
     //requestAnimationFrame(display_html);
 }
 
-let bufferbytesratesmooth = 0;
+let framebytesratesmooth = 0;
 let prev_y = height;
 
 function display_graph() {
     const data = get_stats();
 
-    bufferbytesratesmooth = Utils.lerp(bufferbytesratesmooth, data.buffer_bytes_rate, 0.05);
+    framebytesratesmooth = Utils.lerp(framebytesratesmooth, data.frame_bytes_rate, 0.05);
 
     // Draw line
-    const y = (height - 1) - Math.round((Math.floor(bufferbytesratesmooth / (600_000 / height))));
+    const y = (height - 1) - Math.round((Math.floor(framebytesratesmooth / (600_000 / height))));
     const diff = y - prev_y;
     ctx.fillStyle = "#F00";
     ctx.fillRect(width - 1, diff < 0 ? y : prev_y, 1, Math.abs(y - prev_y) + 1);
