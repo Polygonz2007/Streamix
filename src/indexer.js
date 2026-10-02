@@ -216,6 +216,9 @@ const Indexer = new class {
         // USE ALL CPU
         params.push("-threads", "0");
 
+        // STRIP AWAY ANY IMAGE DATA
+        params.push("-vn");
+
         params.push(output);
 
         // Be quiet!
