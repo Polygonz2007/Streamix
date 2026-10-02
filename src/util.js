@@ -40,12 +40,20 @@ const Utils = new class {
     }
 
     clear_line() {
-        process.stdout.clearLine();
+        if (process.stdout.isTTY)
+            process.stdout.clearLine();
+
+        return;
     }
 
     overwrite_line(text) {
-        process.stdout.cursorTo(0);
-        process.stdout.write(text);
+        if (process.stdout.isTTY) {
+            process.stdout.cursorTo(0);
+            process.stdout.write(text);
+        } else {
+            console.log(text);
+        }
+
         return;
     }
 }
