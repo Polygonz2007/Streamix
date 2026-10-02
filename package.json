@@ -19,7 +19,6 @@
   "homepage": "https://github.com/Polygonz2007/Streamix#readme",
   "dependencies": {
     "@wasm-audio-decoders/flac": "^0.2.5",
-    "better-sqlite3": "^12.2.0",
     "codec-parser": "^2.5.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
