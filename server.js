@@ -1,7 +1,7 @@
 
 // Configurqation of the app
 const config = {
-    http_port: 3008,
+    http_port: 80,
     https_port: 443
 }
 
