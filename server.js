@@ -1,7 +1,7 @@
 
 // Configurqation of the app
 const config = {
-    http_port: 80,
+    http_port: 3008,
     https_port: 443
 }
 
@@ -198,7 +198,7 @@ app.get("/collection/:collection_id/image", async (req, res) => {
         return res.sendFile(path.join(public_path, "asset/logo/512/Winter.png")); // No cover available
 
     // Downsize (constant for now)
-    const size = 1024;
+    const size = 256;
 
     Sharp(image)
     .resize({ width: size, kernel: "mks2021" })
