@@ -11,7 +11,7 @@ const Stream = new class {
 
         // Params
         this.webworkers = false;
-        this.buffer_time = 2; // x seconds of audio should be buffered
+        this.buffer_time = 0.3; // x seconds of audio should be buffered
         
         // Streaming
         this.context;
