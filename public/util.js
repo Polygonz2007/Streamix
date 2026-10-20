@@ -56,6 +56,13 @@ const Utils = new class {
 
         return result;
     }
+
+    seconds_to_mmss(seconds) {
+        const seconds = Math.round(seconds % 60);
+        const minutes = Math.round(seconds / 60);
+
+        return `${minutes}:${seconds}`;
+    }
 }
 
 export default Utils;
