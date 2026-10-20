@@ -49,7 +49,7 @@ const Library = new class {
         this.elements.results.innerHTML += "</ul><p>Collections:<p><ul>";
         for (let i = 0; i < results.collections.length; i++) {
             const collection = results.collections[i];
-            this.elements.results.innerHTML += `<p><img src="/collection/${collection.id}/image" /><span>${collection.name}</span></p>`;
+            this.elements.results.innerHTML += `<li><img src="/collection/${collection.id}/image" /><span>${collection.name}</span></li>`;
         }
         this.elements.results.innerHTML += "</ul><p>Tracks:<p><ul>";
         for (let i = 0; i < results.items.length; i++) {
