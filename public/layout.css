@@ -25,7 +25,12 @@ body {
     }
 }
 
-/*  Library / Queue  */
+/* Input */
+input {
+    padding: 0.4rem 0.8rem; /* TODO: replace with variables (padding-small, padding-normal or sum */
+}
+
+/* Library / Queue */
 .itemlist li {
     display: flex;
     align-items: center;

@@ -24,6 +24,8 @@ This file defines the colors, font, and other design / visual choices for the ap
 
     --border-thickness: 2px;
 
+    --round-normal: 0.25rem;
+
 
     /* Fancy effects */
     --background-image-effect: contrast(110%) brightness(75%) saturate(120%);
@@ -116,4 +118,17 @@ body {
     /*position: absolute;
     width: 100vw;
     height: 100vh;*/
+}
+
+input {
+    color: var(--color-normal);
+    background-color: var(--color-background);
+    
+    border: var(--border-default);
+    border-radius: var(--round-normal);
+}
+
+.no-background {
+    background-color: #0000;
+    border: 0;
 }
