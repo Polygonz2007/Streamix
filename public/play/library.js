@@ -2,6 +2,7 @@
 import Comms from "/comms.js";
 
 import { Queue, Item } from "./queue.js";
+import Utils from "../../src/util.js";
 
 const Library = new class {
     constructor() {
@@ -60,8 +61,12 @@ const Library = new class {
             const img = document.createElement("img");
             img.src = `/collection/${(await Comms.fetch_json(`/item/${item.id}`)).collection.id}/image`;
 
-            const span = document.createElement("span");
-            span.innerHTML = `${track.number}. ${track.name}`;
+            const title = document.createElement("span");
+            title.innerHTML = `${track.number}. ${track.name}`;
+
+            const duration = document.createElement("span");
+            duration.innerHTML = `${Utils.seconds_to_mmss(track.duration)}`;
+            duration.classList.add("color-light");
 
             const input = document.createElement("input");
             input.type = "button";
@@ -70,7 +75,8 @@ const Library = new class {
             input.addEventListener("click", () => { Queue.add(new Item(results.items[i].id)); });
 
             li.appendChild(img);
-            li.appendChild(span);
+            li.appendChild(title);
+            li.appendChild(duration);
             li.appendChild(input);
             this.elements.results.appendChild(li);
         }
