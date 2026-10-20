@@ -58,9 +58,15 @@ const Utils = new class {
     }
 
     seconds_to_mmss(t) {
-        const seconds = Math.round(t % 60);
-        const minutes = Math.round(t / 60);
+        // 1, 5
+        let seconds = Math.round(t % 60).toString();
+        let minutes = Math.round(t / 60).toString();
 
+        // 01, 05
+        if (seconds.length == 1) seconds = "0" + seconds;
+        if (minutes.length == 1) minutes = "0" + minutes;
+
+        // 01:05
         return `${minutes}:${seconds}`;
     }
 }
