@@ -2,7 +2,7 @@
 import Comms from "/comms.js";
 
 import { Queue, Item } from "./queue.js";
-import Utils from "../../src/util.js";
+import Utils from "/util.js";
 
 const Library = new class {
     constructor() {
