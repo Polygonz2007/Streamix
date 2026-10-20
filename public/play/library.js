@@ -67,6 +67,7 @@ const Library = new class {
             const duration = document.createElement("span");
             duration.innerHTML = `${Utils.seconds_to_mmss(track.duration)}`;
             duration.classList.add("color-light");
+            duration.classList.add("duration");
 
             const input = document.createElement("input");
             input.type = "button";

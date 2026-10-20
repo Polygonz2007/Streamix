@@ -42,3 +42,9 @@ input {
     text-align: left;
     margin: 0 1rem;
 }
+
+.itemlist li span.duration {
+    flex-grow: 0;
+    text-align: left;
+    margin: 0 1rem;
+}
