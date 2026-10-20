@@ -12,6 +12,12 @@ This file defines the layout of the app, where elements are placed.
     --settings-sidebar-width: 14rem;
 }
 
+body {
+    margin: 0;
+    width: 100vw;
+    height: 100vh;
+}
+
 /*  Phone  */
 @media only screen and (max-width: 500px) {
     body {
