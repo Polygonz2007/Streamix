@@ -211,6 +211,8 @@ app.get("/collection/:collection_id/image", async (req, res) => {
 
 // Searching
 app.post("/search", async (req, res) => {
+    const start_t = performance.now();
+    
     // Check
     let string = req.body.string;
     if (string == "")
@@ -227,6 +229,11 @@ app.post("/search", async (req, res) => {
 
     // Search
     const results = dbi.search(string, page, page_size);
+
+    // Time
+    const end_t = performance.now();
+    console.log(`Took ${end_t - start_t} ms to complete search.`);
+
     return res.send(results);
 });
 
