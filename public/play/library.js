@@ -42,17 +42,17 @@ const Library = new class {
         });
 
         // Display results
-        this.elements.results.innerHTML = `<p>${results.creators.length} creators, ${results.collections.length} collections, and ${results.items.length} items.`;
-        this.elements.results.innerHTML += "<p>Creators:<p><ul>";
+        this.elements.results.innerHTML = `<p>${results.creators.length} creators, ${results.collections.length} collections, and ${results.items.length} items.</p>`;
+        this.elements.results.innerHTML += "<p>Creators:</p>";
         for (let i = 0; i < results.creators.length; i++) {
             this.elements.results.innerHTML += `<li><img src="/asset/icon/Creator.svg" /><span>${results.creators[i].name}</span></li>`;
         }
-        this.elements.results.innerHTML += "</ul><p>Collections:<p><ul>";
+        this.elements.results.innerHTML += "<p>Collections:</p>";
         for (let i = 0; i < results.collections.length; i++) {
             const collection = results.collections[i];
             this.elements.results.innerHTML += `<li><img src="/collection/${collection.id}/image" /><span>${collection.name}</span></li>`;
         }
-        this.elements.results.innerHTML += "</ul><p>Tracks:<p><ul>";
+        this.elements.results.innerHTML += "<p>Tracks:</p>";
         for (let i = 0; i < results.items.length; i++) {
             const item = results.items[i];
             const track = item.track;
