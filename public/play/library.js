@@ -59,7 +59,9 @@ const Library = new class {
             const li = document.createElement("li");
 
             const img = document.createElement("img");
-            img.src = `/collection/${(await Comms.fetch_json(`/item/${item.id}`)).collection.id}/image`;
+            (async () => { // Fill in image when possible TODO: use caching instead
+                img.src = `/collection/${(await Comms.fetch_json(`/item/${item.id}`)).collection.id}/image`;
+            })();
 
             const title = document.createElement("span");
             title.innerHTML = `${track.number}. ${track.name}`;
