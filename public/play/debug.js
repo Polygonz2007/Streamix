@@ -3,6 +3,10 @@
 
 import Stream from "./stream.js"
 
+const config = {
+    draw_timeline: false
+}
+
 const canvas = document.querySelector("canvas#frame-debug");
 const ctx = canvas.getContext("2d");
 
@@ -21,6 +25,37 @@ async function viz_frames() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.font = "24px Nebula Sans";
 
+    // Main Text
+    const t = Stream.context.currentTime || 0;
+    time1.innerHTML = `Clock: ${t.toFixed(2)}s`;
+    time2.innerHTML = `Offset: ${Stream.time_offset.toFixed(2)}s + ${Stream.time_delay.toFixed(2)}s`;
+
+    const newest_frame = Stream.frames.newest;
+    if (newest_frame)
+        buffer.innerHTML = `Buffer Health: ${(newest_frame.time.end - Stream.time).toFixed(1)}s`;
+    else
+        buffer.innerHTML = `Buffer Health: ?`;
+
+    if (!Stream.format) {
+        quality.innerHTML = "None";
+    } else {
+        if (Stream.format.lossless)
+            quality.innerHTML = `${Stream.format.name}, lossless, ${Stream.format.samplerate} Hz @ ${Stream.format.bitdepth} bits per sample`;
+        else
+            quality.innerHTML = `${Stream.format.name}, lossy, ${Stream.format.samplerate} Hz @ ${Stream.format.bitrate} kbps`;
+    }
+    
+    // Frame Text
+    if (newest_frame) {
+        let index = newest_frame.index.toString();
+        frame.innerHTML = `Buffering Frame Index: #${"0".repeat(5 - index.length) + index}`;
+    } else {
+        frame.innerHTML = `Buffering Frame Index: #?????`;
+    }
+
+    // Frame viz
+    if (!config.draw_timeline) { requestAnimationFrame(viz_frames); return; }
+    
     for (let i = 0; i < Stream.frames.size; i++) {
         const frame = Stream.frames.item[i];
         if (!frame)
@@ -58,35 +93,6 @@ async function viz_frames() {
     // Playhead
     ctx.fillStyle = "#FFF8";
     ctx.fillRect((0.5 * canvas.width) - (1 * window.devicePixelRatio), 0, 2 * window.devicePixelRatio, canvas.height);
-
-
-    // and then also draw more info
-    const t = Stream.context.currentTime || 0;
-    time1.innerHTML = `Clock: ${t.toFixed(2)}s`;
-    time2.innerHTML = `Offset: ${Stream.time_offset.toFixed(2)}s + ${Stream.time_delay.toFixed(2)}s`;
-
-    const newest_frame = Stream.frames.newest;
-    if (newest_frame)
-        buffer.innerHTML = `Buffer Health: ${(newest_frame.time.end - Stream.time).toFixed(1)}s`;
-    else
-        buffer.innerHTML = `Buffer Health: ?`;
-
-    if (!Stream.format) {
-        quality.innerHTML = "None";
-    } else {
-        if (Stream.format.lossless)
-            quality.innerHTML = `${Stream.format.name}, lossless, ${Stream.format.samplerate} Hz @ ${Stream.format.bitdepth} bits per sample`;
-        else
-            quality.innerHTML = `${Stream.format.name}, lossy, ${Stream.format.samplerate} Hz @ ${Stream.format.bitrate} kbps`;
-    }
-    
-    // Frame info
-    if (newest_frame) {
-        let index = newest_frame.index.toString();
-        frame.innerHTML = `Buffering Frame Index: #${"0".repeat(5 - index.length) + index}`;
-    } else {
-        frame.innerHTML = `Buffering Frame Index: #?????`;
-    }
 
     requestAnimationFrame(viz_frames);
 }
