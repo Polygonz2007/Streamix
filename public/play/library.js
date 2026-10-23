@@ -8,7 +8,7 @@ const Library = new class {
     constructor() {
         // Searching
         this.page = 0;
-        this.page_size = 8;
+        this.page_size = 32;
         this.filter = {
             artists: true,
             collections: true,
@@ -44,11 +44,11 @@ const Library = new class {
         // Display results
         this.elements.results.innerHTML = `<p>${results.creators.length} creators, ${results.collections.length} collections, and ${results.items.length} items.</p>`;
         this.elements.results.innerHTML += "<p>Creators:</p>";
-        for (let i = 0; i < results.creators.length; i++) {
+        for (let i = 0; i < 4; i++) { // show only 4 creators for now
             this.elements.results.innerHTML += `<li><img src="/asset/icon/Creator.svg" /><span>${results.creators[i].name}</span></li>`;
         }
         this.elements.results.innerHTML += "<p>Collections:</p>";
-        for (let i = 0; i < results.collections.length; i++) {
+        for (let i = 0; i < 4; i++) { // show only 4 collections for now
             const collection = results.collections[i];
             this.elements.results.innerHTML += `<li><img src="/collection/${collection.id}/image" /><span>${collection.name}</span></li>`;
         }
