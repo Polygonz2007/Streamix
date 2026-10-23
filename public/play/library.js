@@ -45,13 +45,13 @@ const Library = new class {
         this.elements.results.innerHTML = `<p>${results.creators.length} creators, ${results.collections.length} collections, and ${results.items.length} items.</p>`;
         this.elements.results.innerHTML += "<p>Creators:</p>";
         for (let i = 0; i < results.creators.length; i++) {
-            if (i > 4) return; // show max 4 creators
+            if (i > 4) continue; // show max 4 creators
 
             this.elements.results.innerHTML += `<li><img src="/asset/icon/Creator.svg" /><span>${results.creators[i].name}</span></li>`;
         }
         this.elements.results.innerHTML += "<p>Collections:</p>";
         for (let i = 0; i < results.collections.length; i++) {
-            if (i > 4) return; // show max 4 collections
+            if (i > 4) continue; // show max 4 collections
 
             const collection = results.collections[i];
             this.elements.results.innerHTML += `<li><img src="/collection/${collection.id}/image" /><span>${collection.name}</span></li>`;
