@@ -21,13 +21,40 @@ body {
 /*  Phone  */
 @media only screen and (max-width: 500px) {
     body {
-        zoom: 80%;
+        zoom: 100%;
+    }
+
+    .info {
+        flex-direction: column;
     }
 }
 
 /* Input */
 input {
     padding: 0.4rem 0.8rem; /* TODO: replace with variables (padding-small, padding-normal or sum */
+}
+
+/** Playing Info **/
+.info {
+    display: flex;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+
+    justify-content: center;
+    align-items: center;
+    gap: 6rem;
+}
+
+.info img {
+    width: 32rem;
+    max-width: 80vw;
+
+    border-radius: 1rem;
+}
+
+.info .text {
+    text-align: left;
+    max-width: 80vw;
 }
 
 /* Library / Queue */

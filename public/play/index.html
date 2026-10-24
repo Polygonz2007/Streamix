@@ -23,29 +23,35 @@
     </head>
 
     <body>
-        <div id="info">
-            <h1 id="title">Title [Number / Total]</h1>
-            <h2 id="artist">Artist(s)</h2>
-            <h2 id="album">Album</h2>
-            <br>
-            <h2 id="queue-info">Queue Index / Queue Length</h2>
-            <br>
-            <h2 id="time1">Global Time / Track Time</h2>
-            <h2 id="time2">Time Offset / Delay Offset</h2>
-            <br>
-            <h2 id="buffer">Buffer Health: ?</h2>
-            <h2 id="quality">[format] @ [samplerate] hz</h2>
-            <br>
-            <h2 id="frame">Frame: #0000</h2>
-
-            <div>
-                <button onclick="window.stream.set_state(null, -3, null)">Opus Low</button>
-                <button onclick="window.stream.set_state(null, -2, null)">Opus Medium</button>
-                <button onclick="window.stream.set_state(null, -1, null)">Opus High</button>
-                <button onclick="window.stream.set_state(null, 0, null)">Opus Max</button>
-                <button onclick="window.stream.set_state(null, 1, null)">FLAC CD</button>
-                <button onclick="window.stream.set_state(null, 2, null)">FLAC HD</button>
-                <button onclick="window.stream.set_state(null, 3, null)">FLAC Max</button>
+        <div class="info">
+            <div class="image">
+                <img src="/asset/logo/512/Winter Round.png">
+            </div>
+            
+            <div class="text">
+                <h1 id="title">Title [Number / Total]</h1>
+                <h2 id="creator">Creator(s)</h2>
+                <h2 id="collection">Collection</h2>
+                <br>
+                <h2 id="queue-info">Queue Index / Queue Length</h2>
+                <br>
+                <h2 id="time1">Global Time / Track Time</h2>
+                <h2 id="time2">Time Offset / Delay Offset</h2>
+                <br>
+                <h2 id="buffer">Buffer Health: ?</h2>
+                <h2 id="quality">[format] @ [samplerate] hz</h2>
+                <br>
+                <h2 id="frame">Frame: #0000</h2>
+    
+                <div>
+                    <button onclick="window.stream.set_state(null, -3, null)">Opus Low</button>
+                    <button onclick="window.stream.set_state(null, -2, null)">Opus Medium</button>
+                    <button onclick="window.stream.set_state(null, -1, null)">Opus High</button>
+                    <button onclick="window.stream.set_state(null, 0, null)">Opus Max</button>
+                    <button onclick="window.stream.set_state(null, 1, null)">FLAC CD</button>
+                    <button onclick="window.stream.set_state(null, 2, null)">FLAC HD</button>
+                    <button onclick="window.stream.set_state(null, 3, null)">FLAC Max</button>
+                </div>
             </div>
         </div>
 
