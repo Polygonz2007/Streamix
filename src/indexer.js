@@ -46,6 +46,7 @@ const Indexer = new class {
         // Check if we have read file. If not, read it into file data
         let file_data = this.file_data.get(params.track_id);
         if (!file_data) {
+            console.log(database.get_track_id(params.track_id));
             const path = database.get_track_id(params.track_id).path;
             this.file_data.set(params.track_id, await fs.readFile(path));
         }
