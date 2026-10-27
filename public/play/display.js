@@ -41,7 +41,7 @@ const Display = new class {
         this.elements.collection.innerHTML = `<span>from </span><a>${item.collection.name}</a>`;
 
         // Set image
-        this.elements.image.src = `/collection/${item.collection.id}/image`;
+        this.elements.image.src = `/collection/${item.collection.id}/cover_size_3`;
 
         return true;
     }
@@ -50,6 +50,8 @@ const Display = new class {
         this.elements.title.innerHTML = "Title [Number / Total]";
         this.elements.creator.innerHTML = "Creator(s)";
         this.elements.collection.innerHTML = `Collection`;
+
+        this.elements.image.src = `/asset/logo/512/Winter.png`;
 
         document.querySelector("#queue-info").innerHTML = `...`;
         return true;
