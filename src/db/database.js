@@ -395,6 +395,14 @@ export function get_items() {
     return result;
 }
 
+export function remove_item(id) {
+    // Get
+    const select = db.prepare(`DELETE FROM item WHERE track_id = $track_id`);
+    const result = select.run({ $track_id: track_id });
+    
+    return result;
+}
+
 // TRACK_FORMAT
 export function add_track_format(track_id, format_id, ready) {
     // Insert

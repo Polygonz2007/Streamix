@@ -247,6 +247,26 @@ app.get("/admin/library/items", (req, res) => {
     return res.send(database.get_items());
 });
 
+app.post("/admin/library/items", (req, res) => {
+    let action = req.body.action;
+    if (action == "")
+        return res.status(400).send("Please provide an action.");
+
+    let item_id = parseInt(req.body.item_id);
+    if (!item_id)
+        return res.status(400).send("Please provide an item_id.");
+
+    // Execute
+    let result;
+    switch (action) {
+        case "remove":
+            result = database.remove_item(item_id);
+            break;
+    }
+
+    return res.send(result);
+});
+
 
 // last fm
 app.get("/lastfm/auth", (req, res) => {
