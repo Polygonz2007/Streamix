@@ -260,6 +260,15 @@ export function get_track_item(id) {
     return result;
 }
 
+// TODO: add paging or remove
+export function get_tracks() {
+    // Get
+    const select = db.prepare(`SELECT * FROM track`);
+    const result = select.all();
+
+    return result;
+}
+
 
 // TRACK_GENRE
 export function track_genres(track_id, genres) {

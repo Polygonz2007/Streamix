@@ -238,6 +238,10 @@ app.post("/search", async (req, res) => {
 });
 
 
+// Administration
+app.get("/admin/library/tracks", (req, res) => {
+    return res.send(database.get_tracks());
+})
 
 
 // last fm
