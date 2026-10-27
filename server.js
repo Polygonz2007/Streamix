@@ -186,19 +186,34 @@ app.get("/collection/:collection_id", async (req, res) => {
     return res.send(data);
 });
 
-app.get("/collection/:collection_id/image", async (req, res) => {
+app.get("/collection/:collection_id/cover_size_:size", async (req, res) => {
     // Get IDs
     const collection_id = parseInt(req.params.collection_id);
     if (!collection_id)
         return res.sendStatus(400).send("Collection does not exist.");
+
+    // Get downsize factor
+    const scale = parseInt(req.params.size);
+    if (scale < 0 || scale > 6)
+        return res.status(400).send("Size must be between 0 and 6. You gave " + scale);
 
     // Get image
     let { image } = database.get_collection_image(collection_id);
     if (!image)
         return res.sendFile(path.join(public_path, "asset/logo/512/Winter.png")); // No cover available
 
-    // Downsize (constant for now)
-    const size = 256;
+    // Get current size
+    const sharp_img = Sharp(image);
+    const metadata = await sharp_img.metadata();
+    const current = metadata.width;
+
+    // Find new size
+    const size = 2048 / 2 ** (scale - 1);
+
+    // return original if scale is 0 or size too big
+    if (scale == 0 || size > current)
+        return res.contentType("image/jpeg").send(Buffer.from(image));
+
 
     Sharp(image)
     .resize({ width: size, kernel: "mks2021" })

@@ -54,7 +54,7 @@ const Library = new class {
             if (i > 4) continue; // show max 4 collections
 
             const collection = results.collections[i];
-            this.elements.results.innerHTML += `<li><img src="/collection/${collection.id}/image" /><span>${collection.name}</span></li>`;
+            this.elements.results.innerHTML += `<li><img src="/collection/${collection.id}/cover_size_6" /><span>${collection.name}</span></li>`;
         }
         this.elements.results.innerHTML += "<p>Tracks:</p>";
         for (let i = 0; i < results.items.length; i++) {
@@ -64,7 +64,7 @@ const Library = new class {
 
             const img = document.createElement("img");
             (async () => { // Fill in image when possible TODO: use caching instead
-                img.src = `/collection/${(await Comms.fetch_json(`/item/${item.id}`)).collection.id}/image`;
+                img.src = `/collection/${(await Comms.fetch_json(`/item/${item.id}`)).collection.id}/cover_size_6`;
             })();
 
             const title = document.createElement("span");
