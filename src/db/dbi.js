@@ -160,7 +160,12 @@ export function get_meta(item_id) {
     let result = {};
 
     // Get track collection
-    const { track_id, collection_id } = database.get_item_id(item_id);
+    const item = database.get_item_id(item_id);
+    if (!item)
+        return false;
+
+    const track_id = item.track_id;
+    const collection_id = item.collection_id;
 
     // Get track
     result.track = database.get_track_id(track_id);
