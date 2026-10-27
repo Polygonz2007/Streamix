@@ -386,6 +386,15 @@ export function get_item_track_collection(track_id, collection_id) {
     return result;
 }
 
+// TODO: add paging or remove
+export function get_items() {
+    // Get
+    const select = db.prepare(`SELECT * FROM item`);
+    const result = select.all();
+
+    return result;
+}
+
 // TRACK_FORMAT
 export function add_track_format(track_id, format_id, ready) {
     // Insert

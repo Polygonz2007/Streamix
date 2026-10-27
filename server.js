@@ -241,7 +241,11 @@ app.post("/search", async (req, res) => {
 // Administration
 app.get("/admin/library/tracks", (req, res) => {
     return res.send(database.get_tracks());
-})
+});
+
+app.get("/admin/library/items", (req, res) => {
+    return res.send(database.get_items());
+});
 
 
 // last fm
