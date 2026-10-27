@@ -55,6 +55,7 @@ const Indexer = new class {
         // Check if we have read file. If not, read it into file data
         let file_data = this.file_data.get(params.track_id);
         if (!file_data) {
+            console.log(database.get_track_id(params.track_id));
             const path = database.get_track_id(params.track_id).path;
             this.file_data.set(params.track_id, await fs.readFile(path));
         }
@@ -94,18 +95,21 @@ const Indexer = new class {
         const creator = dbi.creator(data.common.albumartist || data.common.artists[0], creator_type, true);
         if (!creator) {
             console.log("Something went wrong adding creator.");
+            console.log(`Creator: ${data.common.albumartist || data.common.artists[0]}\nType: ${creator_type}`);
             return;
         }
 
         const collection = dbi.collection(data.common.album, collection_type, creator, null, true);
         if (!collection) {
             console.log("Something went wrong adding collection.");
+            console.log(`Collection: ${data.common.album}\nType: ${collection_type}`);
             return;
         }
 
         const track = dbi.track(data.common.title, data.common.track.no, data.common.disk.no, data.format.duration, data.common.date, collection, file_path);
-        if (!creator) {
+        if (!track) {
             console.log("Something went wrong adding track.");
+            console.log(`Title: ${data.common.title}\nNumber: ${data.common.track.no}\nDisk: ${data.common.disk.no}\nDuration: ${data.format.duration}\nDate: ${data.common.date}\nCollection: ${collection}\nPath: ${file_path}`);
             return;
         }
         

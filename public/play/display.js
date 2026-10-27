@@ -2,10 +2,10 @@
 const Display = new class {
     constructor() {
         this.elements = {
-            //"cover": document.querySelector("#album-cover"),
-            "title": document.querySelector("#title"),
-            "album": document.querySelector("#album"),
-            "artist": document.querySelector("#artist"),
+            "image": document.querySelector(".info img"),
+            "title": document.querySelector(".info #title"),
+            "collection": document.querySelector(".info #collection"),
+            "creator": document.querySelector(".info #creator"),
 
             "controls": document.querySelector("#controls")
         }
@@ -19,37 +19,37 @@ const Display = new class {
             return; 
 
         // Generate artist html
-        let artist_html = "<span>by </span>";
+        let creators_html = "<span>by </span>";
         const num_creators = item.creators.length;
 
         for (let i = 0; i < num_creators; i++) {
             // Add spacings
             if (num_creators > 1) {
                 if (i == num_creators - 1)
-                    artist_html += "<span> and </span>";
+                    creators_html += "<span> and </span>";
                 else if (i > 0)
-                    artist_html += "<span>, </span>";
+                    creators_html += "<span>, </span>";
             }
 
             // Add artist name
-            artist_html += `<a>${item.creators[i].name}</a>`
+            creators_html += `<a>${item.creators[i].name}</a>`
         }
 
         // Set text
         this.elements.title.innerHTML = item.track.name;
-        this.elements.artist.innerHTML = artist_html;
-        this.elements.album.innerHTML = `<span>from </span><a>${item.collection.name}</a>`;
+        this.elements.creator.innerHTML = creators_html;
+        this.elements.collection.innerHTML = `<span>from </span><a>${item.collection.name}</a>`;
 
-        // Backgroound
-        document.querySelector("body").style.backgroundImage = `url(/collection/${item.collection.id}/image)`;
+        // Set image
+        this.elements.image.src = `/collection/${item.collection.id}/image`;
 
         return true;
     }
 
     clear_item() {
         this.elements.title.innerHTML = "Title [Number / Total]";
-        this.elements.artist.innerHTML = "Artist(s)";
-        this.elements.album.innerHTML = `Album`;
+        this.elements.creator.innerHTML = "Creator(s)";
+        this.elements.collection.innerHTML = `Collection`;
 
         document.querySelector("#queue-info").innerHTML = `...`;
         return true;

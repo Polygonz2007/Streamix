@@ -249,7 +249,32 @@ app.get("/lastfm/auth", (req, res) => {
     // THIS IS JUST FO TESTING
 });
 
+// Metrics (prometheus)
+app.get("/metrics", (req, res) => {
+    return res.type("text/plain").send(
+`
+# HELP streamix_ws_req Number of audio packets sent to clients.
+# TYPE streamix_ws_req counter
+streamix_ws_req ${Stats.stats.ws_req}
 
+# HELP streamix_frame_bytes Number of bytes in audio packets sent to clients.
+# TYPE streamix_frame_bytes counter
+streamix_frame_bytes ${Stats.stats.frame_bytes}
+
+# HELP streamix_clients Number of clients connected to streaming socket.
+# TYPE streamix_clients gauge
+streamix_clients ${Stats.stats.clients}
+
+# HELP streamix_cache Number of bytes in streaming cache.
+# TYPE streamix_cache gauge
+streamix_cache ${Stats.stats.cache}
+
+# HELP streamix_http_get Total HTTP requests to server.
+# TYPE streamix_http_get counter
+streamix_http_get ${Stats.stats.http_get}
+`
+);
+});
 
 async function startup() {
     process.title = "Streamix";
