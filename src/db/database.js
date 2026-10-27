@@ -399,7 +399,11 @@ export function remove_item(id) {
     // Get
     const select = db.prepare(`DELETE FROM item WHERE id = $id`);
     const result = select.run({ $id: id });
-    
+
+    // Remove from search index also
+    const select2 = db.prepare(`DELETE FROM search_index WHERE item_id = $id`);
+    const result2 = select.run({ $id: id });
+
     return result;
 }
 
