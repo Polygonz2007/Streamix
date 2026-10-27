@@ -43,6 +43,15 @@ const Indexer = new class {
         // Remove (claim) it
         this.jobs.delete(index);
 
+        // VERBOSE INDEXING
+        let fmt_str;
+        if (params.format.lossless)
+            fmt_str = `${params.format.name}, lossless, ${params.format.samplerate} Hz @ ${params.format.bitdepth} bits per sample`;
+        else
+            fmt_str = `${params.format.name}, lossy, ${params.format.samplerate} Hz @ ${params.format.bitrate} kbps`;
+
+        console.log(`Job #${index}: Track ID ${params.track_id} as ${fmt_str}`);
+
         // Check if we have read file. If not, read it into file data
         let file_data = this.file_data.get(params.track_id);
         if (!file_data) {
