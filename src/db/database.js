@@ -395,10 +395,10 @@ export function get_items() {
     return result;
 }
 
-export function remove_item(id) {
+export function remove_item(item_id) {
     // Get
-    const select = db.prepare(`DELETE FROM item WHERE track_id = $track_id`);
-    const result = select.run({ $track_id: track_id });
+    const select = db.prepare(`DELETE FROM item WHERE item_id = $item_id`);
+    const result = select.run({ $item_id: item_id });
     
     return result;
 }
