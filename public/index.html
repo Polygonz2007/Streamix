@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streamix</title>
+
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        img {
+            margin: 0;
+            padding: 0;
+            width: 128px;
+            height: 128px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Welcome to</h2>
+    <h1>Streamix</h1>
+
+    <p><a href="/play">Play now!</a></p>
+</body>
+
+<script>
+    for (let i = 1; i < 111; i++) {
+        const img = document.createElement("img");
+        document.body.appendChild(img);
+        img.src = `/collection/${i}/cover_size_5`;
+    }
+</script>
+</html>

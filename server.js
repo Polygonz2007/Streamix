@@ -198,9 +198,11 @@ app.get("/collection/:collection_id/cover_size_:size", async (req, res) => {
         return res.status(400).send("Size must be between 0 and 6. You gave " + scale);
 
     // Get image
-    let { image } = database.get_collection_image(collection_id);
+    let image = database.get_collection_image(collection_id);
     if (!image)
         return res.sendFile(path.join(public_path, "asset/logo/512/Winter.png")); // No cover available
+
+    image = image.image;
 
     // Get current size
     const sharp_img = Sharp(image);
