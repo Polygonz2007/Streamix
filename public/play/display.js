@@ -42,6 +42,7 @@ const Display = new class {
 
         // Set image
         this.elements.image.src = `/collection/${item.collection.id}/cover_size_3`;
+        document.body.style.backgroundImage = `url(/collection/${item.collection.id}/cover_size_6)`;
 
         return true;
     }
@@ -52,6 +53,7 @@ const Display = new class {
         this.elements.collection.innerHTML = `Collection`;
 
         this.elements.image.src = `/asset/logo/512/Winter.png`;
+        document.body.style.backgroundImage = ``;
 
         document.querySelector("#queue-info").innerHTML = `...`;
         return true;

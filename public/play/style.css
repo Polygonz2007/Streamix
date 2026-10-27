@@ -274,14 +274,6 @@ input.image:active {
     transform: translate(0, -50%);
 }
 
-#library.loading {
-    #body {
-        background-image: url("/asset/icon/Loading.gif");
-        background-position: center;
-        background-repeat: no-repeat;
-    }
-}
-
 #library > #search {
     height: 3rem;
     width: calc(100% - 1rem);
@@ -454,9 +446,4 @@ label {
 #library #results {
   overflow-y: scroll;
   height: calc(100% - 4rem);
-}
-
-body {
-    background-size: stretch;
-    backdrop-filter: brightness(50%);
 }
