@@ -7,10 +7,12 @@ import { json } from "stream/consumers";
 // TODO: Convert to a class
 
 const stats_path = process.env.stats_path;
+const save_interval = 60; // interval for auto saves of the stats
 
 const Stats = new class {
     constructor() {
         this.stats = {};
+        setInterval((this.save).bind(this), save_interval * 1000);
     }
 
     async load() {
