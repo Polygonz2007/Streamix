@@ -6,7 +6,7 @@ import { json } from "stream/consumers";
 // For now only per session!
 // TODO: Convert to a class
 
-const stats_path = "./stats.json";
+const stats_path = process.env.stats_path;
 
 const Stats = new class {
     constructor() {
@@ -15,8 +15,11 @@ const Stats = new class {
 
     async load() {
         // Load stats
-        if (!existsSync(stats_path))
+        if (!existsSync(stats_path)) {
+            // Init file
+            this.save();
             return;
+        }
 
         let data = readFileSync(stats_path);
         data = JSON.parse(data);

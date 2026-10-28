@@ -5,10 +5,5 @@ node_modules
 # HTTPS certificates
 certs/*
 
-# Database
-src/db/streamix.db
-src/db/streamix.db-shm
-src/db/streamix.db-wal
-
-# Stats
-stats.json
+# Data
+data/*
