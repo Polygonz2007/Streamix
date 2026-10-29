@@ -337,12 +337,12 @@ async function startup() {
     database.open();
 
     // Set up indexer
-    //const music_path = process.env.music_path;
-    //let music_dirs = music_path.split(";");
-    //for (let i = 0; i < music_dirs.length; i++) {
-    //    music_dirs[i] = music_dirs[i].trim();
-    //    await Indexer.scan(music_dirs[i]);
-    //}
+    const music_path = process.env.music_path;
+    let music_dirs = music_path.split(";");
+    for (let i = 0; i < music_dirs.length; i++) {
+        music_dirs[i] = music_dirs[i].trim();
+        await Indexer.scan(music_dirs[i]);
+    }
 
     Utils.clear_line();
     Utils.overwrite_line("Database is up to date.\n");
